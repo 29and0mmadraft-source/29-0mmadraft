@@ -586,6 +586,7 @@ function toggleDark(){const h=document.documentElement,dark=h.getAttribute('data
 (function(){const t=localStorage.getItem('29_theme')||'light';document.documentElement.setAttribute('data-theme',t);const b=document.getElementById('dm-btn');if(b)b.textContent=t==='dark'?'☀️ Light':'🌙 Dark';})();
 
 let GAME_MODE='normal';let FANTASY_MODE='normal';let TRIVIA_ON=false;
+let godModeUnlocked=false; // hidden GOD MODE secret
 function setMode(m,btn){
  GAME_MODE=m;
  document.querySelectorAll('#home-modes .mode-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
@@ -758,7 +759,7 @@ const FIGHTERS=[
 {name:"Mark Coleman",fullName:"Mark Coleman",nick:"The Hammer",wc:"HW",gender:"M",height:'6\'1"',weightLbs:230,discipline:"Freestyle Wrestling",rec:"16-10",w:16,l:10,streak:5,ufc:true,titles:1,org:"MMA",init:"MCo",striking:74,wrestling:99,power:86,chin:88,stamina:79,defense:82,submission:95,durability:86,tier:"B"},
 {name:"Jan Blachowicz",fullName:"Jan Błachowicz",nick:"Prince of Cieszyn",wc:"LHW",gender:"M",height:'6\'2"',weightLbs:205,discipline:"Boxing / Wrestling",rec:"28-9",w:28,l:9,streak:3,ufc:true,titles:1,org:"MMA",init:"JBl",striking:85,wrestling:79,power:90,chin:84,stamina:80,defense:80,submission:75,durability:82,tier:"B"},
 {name:"Antonio Rodrigo Nogueira",fullName:"Antônio Rodrigo Nogueira",nick:"Big Nog",wc:"HW",gender:"M",height:'6\'3"',weightLbs:235,discipline:"BJJ",rec:"35-9",w:35,l:9,streak:11,ufc:true,titles:1,org:"MMA",init:"BN",striking:82,wrestling:75,power:81,chin:90,stamina:79,defense:78,submission:83,durability:85,tier:"B"},
-{name:"Quinton Jackson",fullName:"Quinton Jackson",nick:"Rampage",wc:"LHW",gender:"M",height:'6\'1"',weightLbs:205,discipline:"Wrestling / Boxing",rec:"37-14",w:37,l:14,streak:5,ufc:true,titles:1,org:"MMA",init:"QJ",striking:88,wrestling:78,power:92,chin:86,stamina:78,defense:80,submission:74,durability:84,tier:"B"},
+{name:"Quinton Jackson",fullName:"Quinton Jackson",nick:"Rampage",wc:"LHW",gender:"M",height:'6\'1"',weightLbs:205,discipline:"Wrestling / Boxing",rec:"37-14",w:37,l:14,streak:5,ufc:true,titles:1,org:"MMA",init:"QJ",striking:88,wrestling:84,power:94,chin:90,stamina:84,defense:82,submission:70,durability:88,legacyOverride:177,tier:"PRIME"},
 {name:"Takanori Gomi",fullName:"Takanori Gomi",nick:"The Fireball Kid",wc:"LW",gender:"M",height:'5\'8"',weightLbs:155,discipline:"Shooto / Boxing",rec:"37-14",w:37,l:14,streak:8,ufc:false,titles:1,org:"MMA",init:"TG",striking:90,wrestling:68,power:84,chin:78,stamina:84,defense:70,submission:50,durability:75,tier:"B"},
 {name:"Usman Nurmagomedov",fullName:"Usman Nurmagomedov",nick:"Eagle Jr.",wc:"LW",gender:"M",height:'5\'11"',weightLbs:155,discipline:"Sambo / Judo",rec:"18-0",w:18,l:0,streak:18,ufc:false,titles:1,org:"MMA",init:"UN",striking:83,wrestling:97,power:76,chin:92,stamina:96,defense:95,submission:99,durability:93,tier:"B"},
 {name:"Ramazan Kuramagomedov",fullName:"Ramazan Kuramagomedov",nick:"",wc:"WW",gender:"M",height:'6\'0"',weightLbs:170,discipline:"Sambo / Wrestling",rec:"18-0",w:18,l:0,streak:18,ufc:false,titles:1,org:"MMA",init:"RK",striking:84,wrestling:94,power:78,chin:90,stamina:92,defense:90,submission:98,durability:90,tier:"B"},
@@ -857,7 +858,15 @@ const FIGHTERS=[
 {name:"Raphael Assuncao",fullName:"Raphael Assuncao",nick:"",wc:"BW",gender:"M",height:'5\'6"',weightLbs:135,discipline:"BJJ",rec:"27-9",w:27,l:9,streak:0,ufc:true,titles:0,org:"MMA",init:"RA",striking:78,wrestling:80,power:74,chin:80,stamina:82,defense:80,submission:84,durability:80,tier:"C"},
 {name:"Rob Font",fullName:"Rob Font",nick:"",wc:"BW",gender:"M",height:'5\'8"',weightLbs:135,discipline:"Boxing",rec:"21-8",w:21,l:8,streak:0,ufc:true,titles:0,org:"MMA",init:"RF",striking:88,wrestling:70,power:80,chin:78,stamina:82,defense:78,submission:70,durability:78,tier:"C"},
 {name:"Marlon Moraes",fullName:"Marlon Moraes",nick:"",wc:"BW",gender:"M",height:'5\'6"',weightLbs:135,discipline:"Muay Thai",rec:"23-11",w:23,l:11,streak:0,ufc:false,titles:0,org:"MMA",init:"MM2",striking:88,wrestling:74,power:88,chin:74,stamina:78,defense:78,submission:74,durability:76,tier:"C"},
-{name:"Pedro Munhoz",fullName:"Pedro Munhoz",nick:"",wc:"BW",gender:"M",height:'5\'6"',weightLbs:135,discipline:"BJJ",rec:"20-9",w:20,l:9,streak:0,ufc:true,titles:0,org:"MMA",init:"PM",striking:80,wrestling:74,power:82,chin:84,stamina:80,defense:76,submission:82,durability:82,tier:"C"}
+{name:"Pedro Munhoz",fullName:"Pedro Munhoz",nick:"",wc:"BW",gender:"M",height:'5\'6"',weightLbs:135,discipline:"BJJ",rec:"20-9",w:20,l:9,streak:0,ufc:true,titles:0,org:"MMA",init:"PM",striking:80,wrestling:74,power:82,chin:84,stamina:80,defense:76,submission:82,durability:82,tier:"C"},
+{name:"Gable Steveson",fullName:"Gable Dan Steveson",nick:"",wc:"HW",gender:"M",height:'6\'2"',weightLbs:265,discipline:"Wrestling",rec:"1-0",w:1,l:0,streak:1,ufc:false,titles:0,org:"MMA",init:"GS",striking:62,wrestling:96,power:80,chin:74,stamina:78,defense:72,submission:60,durability:76,tier:"C"},
+{name:"Tito Ortiz",fullName:"Jacob Christopher Ortiz",nick:"",wc:"LHW",gender:"M",height:'6\'2"',weightLbs:205,discipline:"Wrestling / GnP",rec:"21-12-1",w:21,l:12,streak:0,ufc:true,titles:1,org:"MMA",init:"TO",striking:74,wrestling:88,power:82,chin:80,stamina:82,defense:78,submission:74,durability:82,tier:"B"},
+{name:"Mark Kerr",fullName:"Mark Kerr",nick:"",wc:"HW",gender:"M",height:'6\'2"',weightLbs:255,discipline:"Wrestling",rec:"15-11",w:15,l:11,streak:0,ufc:true,titles:0,org:"MMA",init:"MK",striking:70,wrestling:92,power:88,chin:78,stamina:74,defense:74,submission:78,durability:78,tier:"C"},
+{name:"Bo Nickal",fullName:"Bo Nickal",nick:"",wc:"MW",gender:"M",height:'6\'1"',weightLbs:185,discipline:"Wrestling / BJJ",rec:"7-1",w:7,l:1,streak:0,ufc:true,titles:0,org:"MMA",init:"BN",striking:72,wrestling:94,power:80,chin:78,stamina:80,defense:78,submission:86,durability:78,tier:"C"},
+{name:"Joaquin Buckley",fullName:"Joaquin Buckley",nick:"",wc:"WW",gender:"M",height:'5\'10"',weightLbs:170,discipline:"Boxing / Kickboxing",rec:"21-7",w:21,l:7,streak:6,ufc:true,titles:0,org:"MMA",init:"JB",striking:88,wrestling:74,power:90,chin:82,stamina:82,defense:78,submission:72,durability:82,tier:"B"},
+{name:"Kevin Holland",fullName:"Kevin Holland",nick:"",wc:"WW",gender:"M",height:'6\'3"',weightLbs:170,discipline:"BJJ / Kickboxing",rec:"27-12",w:27,l:12,streak:0,ufc:true,titles:0,org:"MMA",init:"KH2",striking:84,wrestling:72,power:84,chin:80,stamina:82,defense:76,submission:80,durability:80,tier:"C"},
+{name:"Dan Severn",fullName:"Dan Severn",nick:"",wc:"HW",gender:"M",height:'6\'2"',weightLbs:255,discipline:"Wrestling",rec:"101-19-7",hideRec:true,w:101,l:19,streak:0,ufc:true,titles:1,org:"MMA",init:"DS2",striking:64,wrestling:92,power:84,chin:82,stamina:80,defense:78,submission:76,durability:84,tier:"C"},
+{name:"Alexander Gustafsson",fullName:"Alexander Gustafsson",nick:"",wc:"LHW",gender:"M",height:'6\'5"',weightLbs:205,discipline:"Boxing / Wrestling",rec:"18-8",w:18,l:8,streak:0,ufc:true,titles:0,org:"MMA",init:"AG",striking:90,wrestling:84,power:84,chin:82,stamina:86,defense:86,submission:74,durability:84,tier:"A"}
 ];
 const OPPS=[
 // ── LHW 205 ──
@@ -1546,8 +1555,12 @@ function currentDraftWc(){
 function divisionChoices(){
   const wc=currentDraftWc();
   const unlockedElite=(f)=>unlockedFighters.has(f.name)||passwordUnlocked;
+  // GOD MODE: only PRIME, S, and GOAT fighters are offered.
+  if(GAME_MODE==='god'){
+    let pool=shuf(FIGHTERS.filter(f=>f.wc===wc&&(f.tier==='GOAT'||f.tier==='PRIME'||f.tier==='S')&&!f.secret));
+    return pool.slice(0,4);
+  }
   // In NORMAL (non-trivia) mode, PRIME and GOAT fighters are hidden until unlocked via Trivia or the 29-0 password.
-  // In Trivia mode they can surface as rewards. Fighters can be chosen multiple times (not excluded once drafted).
   const eliteOK=(f)=>{
     if(f.tier==='GOAT'||f.tier==='PRIME'||f.secret||f.rare){
       return TRIVIA_ON||unlockedElite(f);
@@ -1559,12 +1572,11 @@ function divisionChoices(){
   const elite=shuf(basePool.filter(f=>f.tier==='GOAT'||f.tier==='PRIME'));
   const normal=shuf(basePool.filter(f=>f.tier!=='GOAT'&&f.tier!=='PRIME'));
   let out=[];
-  // Roughly a 1-in-4 chance to seed a single elite fighter into the 6-card selection.
+  // Roughly a 1-in-4 chance to seed a single elite fighter into the 4-card selection.
   if(elite.length&&Math.random()<0.25){out.push(elite[0]);}
-  // Fill the rest with normal fighters; fall back to remaining elites only if nothing else is available.
-  for(const f of normal){if(out.length>=6)break;out.push(f);}
-  if(out.length<6){for(const f of elite){if(out.length>=6)break;if(!out.includes(f))out.push(f);}}
-  return shuf(out).slice(0,6);
+  for(const f of normal){if(out.length>=4)break;out.push(f);}
+  if(out.length<4){for(const f of elite){if(out.length>=4)break;if(!out.includes(f))out.push(f);}}
+  return shuf(out).slice(0,4);
 }
 
 function getCasualChoices(){
@@ -1654,7 +1666,7 @@ function handleAnswer(chosen,q){
  let choices=divisionChoices();let missedHTML='';
  if(rare){
  if(rare.name==='Jon Jones')G.jonesUsed=true;else if(rare.name==='Khabib Nurmagomedov')G.khabibUsed=true;else if(rare.name==='Amanda Nunes')G.nunesUsed=true;else if(rare.name==='Georges St-Pierre')G.gspUsed=true;else if(rare.secret)G.secretUsed[rare.name]=true;else G.primeUsed[rare.name]=true;
- if(correct&&rare.wc===currentDraftWc()){choices=[rare,...choices.filter(f=>f.name!==rare.name)].slice(0,6);if(rare.secret)unlockFighters([rare.name]);}
+ if(correct&&rare.wc===currentDraftWc()){choices=[rare,...choices.filter(f=>f.name!==rare.name)].slice(0,4);if(rare.secret)unlockFighters([rare.name]);}
  else{const isSec=rare.secret,ig=rare.tier==='GOAT';const bg=isSec?'#1a1a2e':ig?'var(--gold-bg)':'var(--purple-bg)';const cl=isSec?'#e040fb':ig?'var(--gold-text)':'var(--purple-text)';missedHTML='';}
  }
  const hdr=rare&&correct?(rare.secret?`<b style="color:#e040fb">??? SECRET unlocked!</b> Choose:`:(rare.tier==='GOAT'?`<b style="color:var(--gold-text)">GOAT available!</b> Choose:`:`<b style="color:var(--purple-text)">PRIME pick!</b> Choose:`)):correct?'Your pick:':'Wrong — lesser picks:';
@@ -1666,7 +1678,7 @@ function handleAnswer(chosen,q){
  // Re-roll regenerates choices for the same correctness (keeps any injected rare if still available)
  G._rerollFn=()=>{
  let nc=divisionChoices();
- if(rare&&correct&&!G.roster.find(r=>r.name===rare.name)&&rare.wc===currentDraftWc()){nc=[rare,...nc.filter(f=>f.name!==rare.name)].slice(0,6);}
+ if(rare&&correct&&!G.roster.find(r=>r.name===rare.name)&&rare.wc===currentDraftWc()){nc=[rare,...nc.filter(f=>f.name!==rare.name)].slice(0,4);}
  renderTriviaPicks(nc);
  };
  renderTriviaPicks(choices);
@@ -1696,23 +1708,28 @@ function buildCard(f,i){
  </div>`;
 }
 function switchModeDraft(){
- const modes=[['normal','🥋 Normal MMA'],['striking','👊 Striking Only'],['grappling','🤼 Grappling Only'],['endless','♾️ Endless']];
+ const modes=[['normal','🥋 Normal MMA'],['striking','👊 Striking Only'],['grappling','🤼 Grappling Only']];
+ // Hidden GOD MODE: unlocked by typing "godmode" (or "god") at the prompt. Only PRIME/S/GOAT fighters appear.
+ if(godModeUnlocked) modes.push(['god','⚡ GOD MODE']);
  const cur=modes.findIndex(m=>m[0]===GAME_MODE);
  let msg='Switch fight mode (current: '+(modes[cur]?modes[cur][1]:GAME_MODE)+'):\n';
  modes.forEach((m,i)=>{msg+=`${i+1}. ${m[1]}\n`;});
  msg+='\nEnter a number (1-'+modes.length+'), or cancel:';
  const ans=prompt(msg,String(cur+1));
  if(ans===null)return;
+ // Secret trigger: typing the code reveals/activates GOD MODE
+ if(ans.toLowerCase().replace(/[^a-z]/g,'')==='godmode'||ans.toLowerCase().replace(/[^a-z]/g,'')==='god'){
+   godModeUnlocked=true;GAME_MODE='god';TRIVIA_ON=false;
+   alert('⚡ GOD MODE unlocked — only PRIME, S, and GOAT fighters will appear.');renderDraft();return;
+ }
  const idx=parseInt(ans)-1;
  if(idx<0||idx>=modes.length||isNaN(idx)){alert('Invalid choice.');return;}
  GAME_MODE=modes[idx][0];
- // Striking/Grappling force trivia off
- if(GAME_MODE==='striking'||GAME_MODE==='grappling')TRIVIA_ON=false;
- // Ask about trivia for modes that allow it
- if(GAME_MODE!=='striking'&&GAME_MODE!=='grappling'){
- TRIVIA_ON=confirm('Enable Trivia Mode (HARD)? \n\nOK = Trivia ON (answer questions to unlock elite fighters)\nCancel = Casual (pick freely + auto-draft available)');
+ if(GAME_MODE==='striking'||GAME_MODE==='grappling'||GAME_MODE==='god')TRIVIA_ON=false;
+ if(GAME_MODE!=='striking'&&GAME_MODE!=='grappling'&&GAME_MODE!=='god'){
+ TRIVIA_ON=confirm('Enable Trivia Mode (HARD)? \n\nOK = Trivia ON (answer questions to unlock elite fighters)\nCancel = Casual (pick freely)');
  }
- alert('Mode set to '+modes[idx][1]+(TRIVIA_ON?' · Trivia ON':' · Casual'));
+ alert('Mode set to '+modes[idx][1]+(GAME_MODE==='god'?'':(TRIVIA_ON?' · Trivia ON':' · Casual')));
  renderDraft();
 }
 
