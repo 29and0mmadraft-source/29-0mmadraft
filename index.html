@@ -1573,6 +1573,9 @@ function getPickChoices(correct){
  return ensureRequiredInPool(c.slice(0,N));
 }
 
+function nextBtn(){
+ return `<button id="lockin-next-btn" class="btn btn-primary" style="margin-top:8px;opacity:.5" disabled onclick="lockInPick()">Select a fighter to continue →</button>`;
+}
 function rerollBtn(){
  if((G.rerolls||0)<=0)return '<div style="font-size:10px;color:var(--text3);text-align:center;margin-top:6px">No re-rolls left this run</div>';
  return `<button class="btn btn-ghost" style="margin-top:8px" onclick="rerollPicks()">🎲 Re-roll picks (${G.rerolls} left)</button>`;
@@ -1684,7 +1687,7 @@ function renderDraft(){
  let choices=divisionChoices();
  const wc=currentDraftWc();
  const reqNote=`<div style="background:var(--purple-bg);color:var(--purple-text);border-radius:var(--radius);padding:8px 12px;margin-bottom:.7rem;font-size:12px;font-weight:700;text-align:center">⚖️ ${wcLabel(wc)} Division — pick one (${G.roster.length+1} of ${REQUIRED_WC.length})</div>`;
- document.getElementById('trivia-zone').innerHTML=reqNote+`<p class="pick-header" style="margin-bottom:8px">Choose your ${wcLabel(wc)} fighter:</p><div class="pick-grid">${choices.map((f,i2)=>buildCard(f,i2)).join('')}</div>`+rerollBtn();
+ document.getElementById('trivia-zone').innerHTML=reqNote+`<p class="pick-header" style="margin-bottom:8px">Choose your ${wcLabel(wc)} fighter:</p><div class="pick-grid">${choices.map((f,i2)=>buildCard(f,i2)).join('')}</div>`+nextBtn()+rerollBtn();
  };
  G._rerollFn=renderCasualPicks;
  renderCasualPicks();
@@ -1713,7 +1716,7 @@ function handleAnswer(chosen,q){
  const reqNote=mustDraftRequired()?`<div class="s-warning" style="margin-bottom:7px">⚖️ Pick one fighter per weight class. Still needed: <b>${missingWc().map(w=>wcLabel(w)).join(', ')}</b></div>`:'';
  const renderTriviaPicks=(ch)=>{
  PICK_MAP._m={};
- div.innerHTML=missedHTML+reqNote+`<p class="pick-header">${hdr}</p><div class="pick-grid">${ch.map((f,i2)=>buildCard(f,i2)).join('')}</div>`+rerollBtn();
+ div.innerHTML=missedHTML+reqNote+`<p class="pick-header">${hdr}</p><div class="pick-grid">${ch.map((f,i2)=>buildCard(f,i2)).join('')}</div>`+nextBtn()+rerollBtn();
  };
  // Re-roll regenerates choices for the same correctness (keeps any injected rare if still available)
  G._rerollFn=()=>{
@@ -1736,7 +1739,7 @@ function buildCard(f,i){
  const eligible=isPickEligible(f);
  const reqWc=mustDraftRequired();
  const lockNote=!eligible?`<div style="font-size:8px;color:var(--red-text);background:var(--red-bg);border-radius:4px;padding:1px 4px;margin-top:3px;text-align:center">${wcLabel(f.wc)} already drafted</div>`:'';
- return `<div class="pick-card${ig?' goat-card':ip?' prime-card':''}${eligible?'':' pick-greyed'}" ${eligible?`onclick="pickFighter('${key}')"`:'style="opacity:.35;cursor:not-allowed;pointer-events:none"'}>
+ return `<div class="pick-card${ig?' goat-card':ip?' prime-card':''}${eligible?'':' pick-greyed'}" ${eligible?`onclick="selectPick('${key}')" data-pickkey="${key}"`:'style="opacity:.35;cursor:not-allowed;pointer-events:none"'}>
  <div class="pc-av" style="${isSec?'background:#1a1a2e;color:#e040fb':av}">${isSec?'❓':fIcon(f)}</div>
  <div class="pc-name">${f.name}</div>
  <div class="pc-rec">${recOf(f)} \u00b7 ${wcLabel(f.wc)}</div>${lockNote}
@@ -1773,12 +1776,28 @@ function switchModeDraft(){
  renderDraft();
 }
 
+let _pendingPick=null;
+function selectPick(key){
+ // Highlight the chosen card without committing; the Next button locks it in
+ _pendingPick=key;
+ document.querySelectorAll('.pick-card').forEach(c=>{
+   c.style.outline=(c.getAttribute('data-pickkey')===key)?'3px solid var(--purple-text)':'';
+   c.style.outlineOffset='2px';
+ });
+ const nb=document.getElementById('lockin-next-btn');
+ if(nb){const f=PICK_MAP.get(key);nb.disabled=false;nb.style.opacity='1';nb.textContent='Lock in '+(f?f.name:'pick')+' →';}
+}
 function pickFighter(key){
+ // Commit a pick to the roster (called by the Next/Lock-in button)
  const f=PICK_MAP.get(key);
- // Fighters may be chosen multiple times across the draft
  if(f){G.roster.push(f);unlockFighters([f.name]);}
  else{const fb=shuf(FIGHTERS.filter(f=>!f.secret))[0];if(fb){G.roster.push(fb);unlockFighters([fb.name]);}}
+ _pendingPick=null;
  renderDraft();
+}
+function lockInPick(){
+ if(!_pendingPick){alert('Select a fighter first.');return;}
+ pickFighter(_pendingPick);
 }
 
 // ════ FIGHT FLOW ════
