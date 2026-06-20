@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-YQ19SRPWBZ"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-YQ19SRPWBZ');
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>29-0 · MMA Fighter Draft</title>
@@ -1130,7 +1138,6 @@ function fighterPerks(f){
  const p=[];
  if(hasDeathTouch(f))p.push({key:'death',icon:'☠️',name:'Death Touch',desc:'95+ power — can score a knockout in any round'});
  if(hasHolyRoller(f))p.push({key:'holy',icon:'🙏',name:'Holy Roller',desc:'95+ submission — can finish by submission in any round'});
- if(hasIronJaw(f))p.push({key:'iron',icon:'🗿',name:'Iron Jaw',desc:'95+ chin — can only be knocked out by a 95+ power fighter'});
  return p;
 }
 
@@ -1304,11 +1311,11 @@ function simOneRound(mine,opp,roundNum,totalRounds,mode,state){
 
  // FINISH DETECTION — increased KO rates + doctor stoppages
  // durability resists finishes; lower durability = easier to finish
- const koBase=mode==='striking'?0.16:mode==='pride'?0.15:0.12;
+ const koBase=mode==='striking'?0.24:mode==='pride'?0.22:0.19;
  const subBase=mode==='grappling'?0.14:mode==='pride'?0.05:0.08;
  // Elite power (95+) and submission (95+) sharply increase finish chance
- const myPwrMult=mine.power>=95?1.6+(mine.power-95)*0.12:1;
- const oppPwrMult=opp.power>=95?1.6+(opp.power-95)*0.12:1;
+ const myPwrMult=mine.power>=95?2.0+(mine.power-95)*0.15:(mine.power>=88?1.25:1);
+ const oppPwrMult=opp.power>=95?2.0+(opp.power-95)*0.15:(opp.power>=88?1.25:1);
  const mySubMult=mySub>=95?1.6+(mySub-95)*0.12:1;
  const oppSubMult=oppSub>=95?1.6+(oppSub-95)*0.12:1;
  const myKoC=(mine.power/100)*koBase*(margin/4+0.4)*(myWon?1:0.3)*(1-(opp.durability||opp.chin)/130)*myPwrMult;
@@ -1331,8 +1338,8 @@ function simOneRound(mine,opp,roundNum,totalRounds,mode,state){
  // ── PERK MODIFIERS ──
  // Iron Jaw: a 95+ chin fighter can ONLY be KO'd by a 95+ power opponent
  let myKo=myKoC, oppKo=oppKoC;
- if(hasIronJaw(opp)&&(mine.power||0)<95) myKo=0; // I can't KO an iron-jawed opponent without 95 power
- if(hasIronJaw(mine)&&(opp.power||0)<95) oppKo=0; // opp can't KO my iron-jawed fighter without 95 power
+ // (Iron Jaw immunity removed — KOs are no longer blocked)
+
  // Death Touch: 95+ power can land a KO in ANY round — give a flat finishing chance even off a slim edge
  if(hasDeathTouch(mine)&&myWon) myKo=Math.max(myKo,0.14+(mine.power-95)*0.015);
  if(hasDeathTouch(opp)&&!myWon) oppKo=Math.max(oppKo,0.14+(opp.power-95)*0.015);
@@ -1355,8 +1362,8 @@ function simOneRound(mine,opp,roundNum,totalRounds,mode,state){
  else if(r<oppKo+oppSub2+oppDocC) finish={type:'DOC',winner:'opp',method:pick(docMths)};
  }
  // Puncher's chance even on a losing round for Death Touch (separate roll)
- if(!finish&&hasDeathTouch(mine)&&!myWon&&!hasIronJaw(opp)&&Math.random()<0.05) finish={type:'KO',winner:'mine',method:pick(mPool)+' (out of nowhere!)',perk:'death'};
- if(!finish&&hasDeathTouch(opp)&&myWon&&!hasIronJaw(mine)&&Math.random()<0.05) finish={type:'KO',winner:'opp',method:pick(mPool)+' (out of nowhere!)',perk:'death'};
+ if(!finish&&hasDeathTouch(mine)&&!myWon&&Math.random()<0.05) finish={type:'KO',winner:'mine',method:pick(mPool)+' (out of nowhere!)',perk:'death'};
+ if(!finish&&hasDeathTouch(opp)&&myWon&&Math.random()<0.05) finish={type:'KO',winner:'opp',method:pick(mPool)+' (out of nowhere!)',perk:'death'};
 
  return {roundNum,myWon,myScore:myWon?10:margin>0.3?8:9,oppScore:myWon?margin>0.3?8:9:10,pbp,finish,attName:att.name.split(' ')[0],defName:def.name.split(' ')[0]};
 }
@@ -1418,11 +1425,11 @@ const INFO_PAGES={
  <p style="margin-top:10px">These terms may be updated at any time.</p>`},
  privacy:{title:'🔒 Privacy Policy',body:`
  <p>Your privacy matters to us. This policy explains how 29-0 handles your data.</p>
- <p style="margin-top:10px"><b>1. Local storage only.</b> The Game stores your progress (unlocked fighters, records, and settings) locally in your browser using localStorage. This data never leaves your device and is not transmitted to any server.</p>
- <p style="margin-top:10px"><b>2. No accounts.</b> We do not require registration, and we do not collect names, emails, or personal information through the Game itself.</p>
- 
- <p style="margin-top:10px"><b>3. Clearing data.</b> You can clear all saved progress at any time by clearing your browser's site data.</p>
- <p style="margin-top:10px"><b>4. Contact.</b> If you email us, we use your message only to respond to you.</p>`},
+ <p style="margin-top:10px"><b>1. Local storage.</b> The Game stores your progress (unlocked fighters, records, and settings) locally in your browser using localStorage. This data stays on your device and is not sent to us.</p>
+ <p style="margin-top:10px"><b>2. Analytics.</b> We use Google Analytics (GA4) to understand how many people visit and how the Game is used. It collects anonymous, aggregated information such as page views, approximate location (country/region), device and browser type, and referring site, and it sets cookies to do so. We do not use this data to identify you personally. You can learn more at Google's privacy policy, and you may opt out using the Google Analytics Opt-out Browser Add-on or your browser's cookie controls.</p>
+ <p style="margin-top:10px"><b>3. No accounts.</b> We do not require registration, and we do not collect names, emails, or personal information through the Game itself.</p>
+ <p style="margin-top:10px"><b>4. Clearing data.</b> You can clear saved progress and analytics cookies at any time by clearing your browser's site data.</p>
+ <p style="margin-top:10px"><b>5. Contact.</b> If you email us, we use your message only to respond to you.</p>`},
  contact:{title:'✉️ Contact Us',body:`
  <p>Have feedback, a bug report, or a fighter suggestion? We'd love to hear from you.</p>
  <div style="background:var(--bg3);border-radius:var(--radius);padding:1rem;margin-top:12px">
