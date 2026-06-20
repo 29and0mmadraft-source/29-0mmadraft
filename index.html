@@ -1831,20 +1831,64 @@ function simulateOneFight(myFighter,opp,champ){
   return lf.finish.winner==='mine';
 }
 function startFights(){
-  G.wins=0;G.losses=0;G.fightsDone=0;
-  const rosterWcs=[...new Set(G.roster.map(f=>f.wc))];
-  const targetFights=29;
-  // Silently simulate the entire run — no matchups shown, just compute the final record
-  for(let i=0;i<targetFights;i++){
-    // Simulate all 29 fights regardless of losses — report the final record
-    const fightWc=rosterWcs[i%rosterWcs.length]||G.roster[0].wc;
-    const eligible=G.roster.filter(f=>f.wc===fightWc);
-    const myFighter=eligible.length?eligible.sort((a,b)=>calcLegacy(b,3,GAME_MODE)-calcLegacy(a,3,GAME_MODE))[0]:G.roster[i%G.roster.length];
-    const opp=getOppForFighter({wc:fightWc,gender:wcGender(fightWc)});
-    G.fightsDone++;
-    if(simulateOneFight(myFighter,opp,G.wins>=15))G.wins++;else G.losses++;
-  }
-  showFinal(G.wins>=29&&G.losses===0);
+  G.wins=0;G.losses=0;G.fightsDone=29;
+  // ── Record is determined by the TOTAL LEGACY SCORE of your drafted roster ──
+  // Sum each fighter's legacy rating; higher total = better record.
+  const totalLegacy=G.roster.reduce((s,f)=>s+calcLegacy(f,3,GAME_MODE),0);
+  G._rosterLegacy=totalLegacy;
+  const baseWins=winsForLegacy(totalLegacy);
+  // Small luck factor: the same roster can swing a couple of fights either way.
+  // Range scales slightly with roster quality (better rosters are more consistent).
+  const swing=(baseWins>=27)?1:2;            // elite rosters vary less
+  let luck=0;
+  for(let s=0;s<2;s++){luck+=Math.floor(Math.random()*(swing+1));}  // 0..2*swing, centered
+  luck-=swing;                               // center around 0 -> range -swing..+swing
+  G.wins=Math.max(0,Math.min(29,baseWins+luck));
+  G.losses=29-G.wins;
+  const perfect=(G.wins>=29&&G.losses===0);
+  showFinal(perfect);
+}
+// Maps a roster's total legacy score to a win total (0..29).
+// Calibrated to the real roster range: worst ~770, median ~1176, best ~2142.
+// Going 29-0 requires a near-perfect, GOAT-stacked roster.
+function winsForLegacy(sum){
+  // Range thresholds: [minLegacySumForThisManyWins]. Index = wins.
+  // Built so each extra win needs a meaningfully better roster, with 29-0 reserved for elite sums.
+  const T=[
+    0,    // 0 wins  (0-29)
+    815,  // 1
+    855,  // 2
+    895,  // 3
+    935,  // 4
+    975,  // 5
+    1015, // 6
+    1055, // 7
+    1095, // 8
+    1135, // 9
+    1175, // 10
+    1215, // 11
+    1255, // 12
+    1295, // 13
+    1335, // 14
+    1375, // 15
+    1415, // 16
+    1455, // 17
+    1500, // 18
+    1545, // 19
+    1590, // 20
+    1640, // 21
+    1690, // 22
+    1745, // 23
+    1800, // 24
+    1860, // 25
+    1925, // 26
+    1995, // 27
+    2070, // 28
+    2140  // 29  (29-0 — requires an elite, GOAT-stacked roster)
+  ];
+  let wins=0;
+  for(let i=0;i<T.length;i++){ if(sum>=T[i]) wins=i; }
+  return Math.max(0,Math.min(29,wins));
 }
 function updateRec(){document.getElementById('w-num').textContent=G.wins;document.getElementById('f-num').textContent=G.fightsDone;document.getElementById('l-num').textContent=G.losses;}
 function isChampFight(){return G.wins>=15;}
