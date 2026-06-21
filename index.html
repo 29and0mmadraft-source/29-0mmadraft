@@ -1755,7 +1755,7 @@ function buildCard(f,i){
  const reqWc=mustDraftRequired();
  const lockNote=!eligible?`<div style="font-size:8px;color:var(--red-text);background:var(--red-bg);border-radius:4px;padding:1px 4px;margin-top:3px;text-align:center">${wcLabel(f.wc)} already drafted</div>`:'';
  return `<div class="pick-card${ig?' goat-card':ip?' prime-card':''}${eligible?'':' pick-greyed'}" ${eligible?`onclick="selectPick('${key}')" data-pickkey="${key}"`:'style="opacity:.35;cursor:not-allowed;pointer-events:none"'}>
- ${(ig||ip)?`<div class="pc-av" style="${av}"></div>`:''}
+ <div class="pc-av" style="${av}">${fIcon(f)}</div>
  <div class="pc-name">${f.name}</div>
  <div class="pc-rec">${wcLabel(f.wc)}</div>${lockNote}
  <div style="text-align:center;margin-top:2px"></div>
