@@ -25,6 +25,8 @@
 <meta property="og:site_name" content="29-0 MMA Draft">
 <!-- Twitter / X Card -->
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@29and0mmadraft">
+<meta name="twitter:creator" content="@29and0mmadraft">
 <meta name="twitter:title" content="29-0 · MMA Fighter Draft">
 <meta name="twitter:description" content="Draft an all-time MMA roster and try to go a perfect 29-0. Can you build a team that never loses?">
 <meta name="twitter:image" content="https://29and0mmadraft.com/preview.png">
@@ -596,7 +598,7 @@ body {
  <span style="color:var(--border)">·</span>
  <a onclick="showInfoPage('contact')" style="color:var(--text3);cursor:pointer;text-decoration:none">Contact Us</a>
  </div>
- <div style="font-size:10px;margin-bottom:8px">📸 <a href="https://instagram.com/29and0mma" target="_blank" rel="noopener" style="color:var(--text3)">@29and0mma</a> · ✉️ 29and0MMADRAFT@gmail.com</div>
+ <div style="font-size:10px;margin-bottom:8px">📸 <a href="https://instagram.com/29and0mma" target="_blank" rel="noopener" style="color:var(--text3)">@29and0mma</a> · 𝕏 <a href="https://x.com/29and0mmadraft" target="_blank" rel="noopener" style="color:var(--text3)">@29and0mmadraft</a> · ✉️ 29and0MMADRAFT@gmail.com</div>
  <div style="font-size:9px;line-height:1.6">29-0 is an independent fan-made MMA simulation game. It is not affiliated with, endorsed by, sponsored by, or connected to UFC, PFL, Bellator, ONE Championship, any fighter, manager, or promotion. All fighter names, records, and historical information are used for informational and commentary purposes. Fighter ratings and simulated outcomes are fictional and created solely for gameplay.</div></div>
 <script>
 
@@ -1448,6 +1450,7 @@ const INFO_PAGES={
  <div style="background:var(--bg3);border-radius:var(--radius);padding:1rem;margin-top:12px">
  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:20px">✉️</span><a href="mailto:29and0MMADRAFT@gmail.com" style="color:var(--purple-text);font-weight:600;text-decoration:none">29and0MMADRAFT@gmail.com</a></div>
  <div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px">📸</span><a href="https://instagram.com/29and0mma" target="_blank" rel="noopener" style="color:var(--purple-text);font-weight:600;text-decoration:none">@29and0mma</a></div>
+  <div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px">𝕏</span><a href="https://x.com/29and0mmadraft" target="_blank" rel="noopener" style="color:var(--purple-text);font-weight:600;text-decoration:none">@29and0mmadraft</a></div>
  </div>
  <p style="margin-top:12px;font-size:12px;color:var(--text3)">Follow us on Instagram for updates, new fighter additions, and roster news.</p>`}
 };
@@ -2144,12 +2147,11 @@ function showFinal(perfect){
  unlockFighters(G.roster.map(f=>f.name));saveRun(G.wins,G.losses,G.roster);show('s-final');
  // Endless champion mode: unlock Tyson at 100+ wins even on the eventual loss
  if(G._endlessChampion&&G.wins>=100&&!localStorage.getItem('29_trophy_100')){localStorage.setItem('29_trophy_100','true');}
- // Going 29-0 unlocks the password, ALL fighters, AND the a title fight Khabib reward!
- if(perfect){passwordUnlocked=true;localStorage.setItem('29_pw','true');FIGHTERS.forEach(f=>{if(f.secret||f.rare)unlockedFighters.add(f.name);});unlockFighters(['Khabib Nurmagomedov (Undefeated)']);saveUnlocked();}
+ // (All fighters are always available — no unlock reward needed for going 29-0.)
  document.getElementById('final-rec').textContent=`${G.wins}-${G.losses}`;
  document.getElementById('final-sub').textContent=G._endlessChampion?`Endless \u00b7 Best streak ${G._bestStreak||G.wins}`:perfect?'Perfect 29-0 \u00b7 Undefeated':'Final simulated record';
  const gc=G.roster.filter(f=>f.tier==='GOAT').length,pc=G.roster.filter(f=>f.tier==='PRIME').length,sc=G.roster.filter(f=>f.tier==='S').length,secC=G.roster.filter(f=>f.tier==='SECRET').length;
- let msg=perfect?`<p style="font-size:13px;line-height:1.75;margin-bottom:.9rem">Undefeated. ${gc} GOAT. ${pc} PRIME. ${secC>0?secC+' SECRET. ':''}Perfect 29-0.</p><div style="background:var(--gold-bg);color:var(--gold-text);border-radius:var(--radius);padding:.7rem;margin-bottom:.7rem;font-size:12px;font-weight:600">🔓 You went 29-0 — ALL fighters permanently unlocked!</div><div style="background:#1a1a2e;color:#e040fb;border-radius:var(--radius);padding:.7rem;margin-bottom:.9rem;font-size:12px;font-weight:600">🦅 REWARD: Khabib Nurmagomedov unlocked — 100 wrestling, 100 submission!</div>`:`<p style="font-size:13px;line-height:1.75;margin-bottom:.9rem">${false?``:G.wins>=27?`${G.wins}-${G.losses} \u2014 agonizingly close to perfection.`:G.wins>=22?`${G.wins}-${G.losses} \u2014 a dominant run.`:G.wins>=15?`${G.wins}-${G.losses} \u2014 a solid showing.`:G.wins>=8?`${G.wins}-${G.losses} \u2014 a respectable result.`:`${G.wins}-${G.losses} \u2014 tough slate.`}</p>${G._endlessChampion&&G.wins>=100?`<div style="background:var(--gold-bg);color:var(--gold-text);border-radius:var(--radius);padding:.7rem;margin-bottom:.9rem;font-size:12px;font-weight:600">🏆 You earned the 100-0 Trophy this run — a perfect century!</div>`:''}`;
+ let msg=perfect?`<p style="font-size:13px;line-height:1.75;margin-bottom:.9rem">Undefeated. ${gc} GOAT. ${pc} PRIME. ${secC>0?secC+' SECRET. ':''}Perfect 29-0.</p>`:`<p style="font-size:13px;line-height:1.75;margin-bottom:.9rem">${false?``:G.wins>=27?`${G.wins}-${G.losses} \u2014 agonizingly close to perfection.`:G.wins>=22?`${G.wins}-${G.losses} \u2014 a dominant run.`:G.wins>=15?`${G.wins}-${G.losses} \u2014 a solid showing.`:G.wins>=8?`${G.wins}-${G.losses} \u2014 a respectable result.`:`${G.wins}-${G.losses} \u2014 tough slate.`}</p>${G._endlessChampion&&G.wins>=100?`<div style="background:var(--gold-bg);color:var(--gold-text);border-radius:var(--radius);padding:.7rem;margin-bottom:.9rem;font-size:12px;font-weight:600">🏆 You earned the 100-0 Trophy this run — a perfect century!</div>`:''}`;
  document.getElementById('final-body').innerHTML=msg+`<div class="final-squad-list" style="background:var(--bg2);border-radius:var(--radius);padding:.8rem 1rem;margin-bottom:1rem;text-align:left">
 <div style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text3);margin-bottom:.5rem;font-weight:700">Your Drafted Squad</div>
 ${G.roster.map(f=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--bg3);font-size:13px">
