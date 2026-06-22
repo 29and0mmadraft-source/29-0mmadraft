@@ -498,7 +498,14 @@ body {
  <b>Trivia Mode (HARD):</b> answer a trivia question before each pick — get it right to choose freely, miss and your options narrow. Fighter records are hidden during the draft, so you pick on knowledge alone.<br>
  </div>
  <div class="mode-row" id="home-modes">
- <button class="mode-btn active" onclick="setMode('normal',this)">Normal MMA</button>
+ <div style="font-size:12px;font-weight:700;margin-bottom:.5rem">🎮 Game Mode</div>
+ <select id="mode-select" onchange="selectMode(this.value)" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;font-family:inherit">
+ <option value="normal">🥊 Normal MMA — draft one fighter per division</option>
+ <option value="salary">💰 Salary Cap — build under a $100 budget</option>
+ <option value="openweight">🏋️ Openweight — anyone, any division, no weight limits</option>
+ <option value="mystery">🎭 Mystery Draft — pick blind by record &amp; finishes, names revealed at the end</option>
+ </select>
+ <div id="mode-desc" style="font-size:11px;color:var(--text3);margin-top:6px"></div>
  </div>
  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:.7rem .9rem;margin-bottom:.9rem">
  <div style="font-size:12px;font-weight:700;margin-bottom:.5rem">🎯 Challenge Mode <span style="font-size:10px;color:var(--text3);font-weight:400">— optional themed run with a target score</span></div>
@@ -625,6 +632,27 @@ function toggleDark(){const h=document.documentElement,dark=h.getAttribute('data
 (function(){const t=localStorage.getItem('29_theme')||'light';document.documentElement.setAttribute('data-theme',t);const b=document.getElementById('dm-btn');if(b)b.textContent=t==='dark'?'☀️ Light':'🌙 Dark';})();
 
 let GAME_MODE='normal';
+// ════ SPECIAL MODES: SALARY CAP, OPENWEIGHT, MYSTERY ════
+const SALARY_CAP=100; // total budget
+// Fighter cost by tier (sums to a tight budget so you can't draft all GOATs)
+function fighterCost(f){
+  const t=f.tier;
+  if(t==='GOAT')return 18;
+  if(t==='CHAMPION')return 15;
+  if(t==='PRIME')return 12;
+  if(t==='S')return 9;
+  if(t==='A')return 6;
+  if(t==='B')return 4;
+  if(t==='SECRET')return 10;
+  return 2; // C and below
+}
+function rosterSpent(){return G.roster.reduce((s,f)=>s+fighterCost(f),0);}
+function capRemaining(){return SALARY_CAP-rosterSpent();}
+// In OPENWEIGHT mode, all 12 division slots draw from the ENTIRE roster (any weight class)
+const OPENWEIGHT_ON=()=>GAME_MODE==='openweight';
+// In MYSTERY mode, names/photos are hidden during the draft and revealed at the end
+const MYSTERY_ON=()=>GAME_MODE==='mystery';
+
 // ════ FUN CHALLENGE MODES ════
 let ACTIVE_CHALLENGE=null; // null = no challenge
 const CHALLENGES=[
@@ -644,8 +672,8 @@ const CHALLENGES=[
    filter:f=>(f.age||0)>=38},
  {id:'youngguns',icon:'⚡',name:'Young Guns',desc:'Draft only fighters aged 30 or under',target:20,
    filter:f=>f.age&&f.age<=30},
- {id:'champs',icon:'🏆',name:'Champions Only',desc:'Draft only current champions & GOATs',target:26,
-   filter:f=>f.tier==='CHAMPION'||f.tier==='GOAT'},
+ {id:'newblood',icon:'🌱',name:'New Blood',desc:'Draft only fighters with fewer than 20 pro fights',target:18,
+   filter:f=>((f.w||0)+(f.l||0))<20},
  {id:'underdogs',icon:'🥊',name:'Underdog Army',desc:'Draft only C-tier or lower fighters',target:12,
    filter:f=>f.tier==='C'||f.tier==='B'}
 ];
@@ -675,6 +703,21 @@ function selectChallenge(id){
  }
 }let FANTASY_MODE='normal';let TRIVIA_ON=false;
 let godModeUnlocked=false; // hidden GOD MODE secret
+function selectMode(m){
+ GAME_MODE=m;
+ const d=document.getElementById('mode-desc');
+ const descs={
+   normal:'Classic mode — draft the best fighter in each of the 12 weight classes.',
+   salary:'Every fighter has a cost by tier (GOAT $18 ... C $2). Build all 12 divisions under a $100 cap — you can\'t afford a roster of all GOATs!',
+   openweight:'No weight limits — fill all 12 slots from the ENTIRE roster. Draft Jon Jones AND Khabib AND Amanda Nunes on one team if you want.',
+   mystery:'Fighters are hidden — you pick blind, seeing only their record, finishes, and stats. Their identities are revealed when your run ends.'
+ };
+ if(d)d.textContent=descs[m]||'';
+ // Mystery & special modes have no trivia
+ const tt=document.getElementById('trivia-toggle');
+ if(m==='mystery'){TRIVIA_ON=false;if(tt){tt.textContent='OFF';tt.classList.remove('active');tt.disabled=true;tt.style.opacity='0.4';}}
+ else if(tt){tt.disabled=false;tt.style.opacity='1';tt.style.cursor='pointer';}
+}
 function setMode(m,btn){
  GAME_MODE=m;
  document.querySelectorAll('#home-modes .mode-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
@@ -715,8 +758,8 @@ const WC={
 // Draft requirement: you must collect at least one fighter from each of these weight classes
 const REQUIRED_WC=['HW','LHW','MW','WW','LW','FW','BW','FLW','WSTRAW','WFLW','WBW','WFW'];
 const DRAFT_SIZE=12; // one fighter per weight class
-function rosterWcCoverage(){const have=new Set(G.roster.map(f=>f.wc));return REQUIRED_WC.map(wc=>({wc,have:have.has(wc)}));}
-function missingWc(){return REQUIRED_WC.filter(wc=>!G.roster.some(f=>f.wc===wc));}
+function rosterWcCoverage(){const have=new Set(G.roster.map(f=>f.wc));return requiredDivisions().map(wc=>({wc,have:have.has(wc)}));}
+function missingWc(){return requiredDivisions().filter(wc=>!G.roster.some(f=>f.wc===wc));}
 const wcLabel=wc=>(WC[wc]||{}).label||wc;
 const wcGender=wc=>(WC[wc]||{}).gender||'M';
 const wcLbs=wc=>(WC[wc]||{}).lbs||999;
@@ -772,7 +815,7 @@ const FIGHTERS=[
 {name:"Francis Ngannou",fullName:"Francis Zavier Ngannou",nick:"The Predator",wc:"HW",gender:"M",height:'6\'4"',weightLbs:263,discipline:"Boxing",rec:"18-3",w:18,l:3,streak:6,ufc:true,titles:1,org:"MMA",init:"FN2",striking:95,wrestling:72,power:100,chin:84,stamina:73,defense:78,submission:54,durability:82,age:40,country:"Cameroon",reach:'83\"',finishes:13,kos:12,subs:1,tier:"PRIME",rare:true,primeNote:"2021-2022 the HW champion peak — 100 power, KO'd Miocic and Gane"},
 {name:"Max Holloway",fullName:"Max Griffin Holloway",nick:"Blessed",wc:"LW",gender:"M",height:'5\'11"',weightLbs:155,discipline:"Boxing / MMA",rec:"26-8",w:26,l:8,streak:3,ufc:true,titles:1,org:"MMA",init:"MH2",striking:98,wrestling:71,power:82,chin:93,stamina:99,defense:87,submission:53,durability:91,age:35,country:"USA",reach:'69"',finishes:12,kos:11,subs:1,tier:"S"},
 {name:"Islam Makhachev",fullName:"Islam Makhachev",nick:"",wc:"LW",gender:"M",height:'5\'11"',weightLbs:155,discipline:"Sambo / Judo",rec:"28-1",w:28,l:1,streak:14,ufc:true,titles:1,org:"MMA",init:"IM",striking:83,wrestling:98,power:79,chin:93,stamina:95,defense:94,submission:99,durability:93,legacyOverride:179,age:35,country:"Russia",reach:'70.5"',finishes:18,kos:5,subs:13,tier:"GOAT",rare:true},
-{name:"Kamaru Usman",fullName:"Kamaru Usman",nick:"Nigerian Nightmare",wc:"WW",gender:"M",height:'6\'0"',weightLbs:170,discipline:"Wrestling",rec:"21-4",w:21,l:4,streak:15,ufc:true,titles:1,org:"MMA",init:"KU",striking:87,wrestling:95,power:82,chin:90,stamina:95,defense:92,submission:91,durability:91,age:39,country:"Nigeria",reach:'76"',finishes:10,kos:5,subs:5,tier:"S",accolades:[{icon:"🏆",text:"Welterweight Champion"},{icon:"🔥",text:"15-fight win streak at WW"},{icon:"🥇",text:"Nigerian Wrestling champion before MMA"},{icon:"💪",text:"Beat Masvidal, Covington, Burns — the WW era"}]},
+{name:"Kamaru Usman",fullName:"Kamaru Usman",nick:"Nigerian Nightmare",wc:"WW",gender:"M",height:'6\'0"',weightLbs:170,discipline:"Wrestling",rec:"21-4",w:21,l:4,streak:15,ufc:true,titles:1,org:"MMA",init:"KU",striking:87,wrestling:95,power:82,chin:90,stamina:95,defense:92,submission:91,durability:91,age:39,country:"Nigeria",reach:'76"',finishes:10,kos:5,subs:5,legacyOverride:178,tier:"PRIME",rare:true,accolades:[{icon:"🏆",text:"Welterweight Champion"},{icon:"🔥",text:"15-fight win streak at WW"},{icon:"🥇",text:"Nigerian Wrestling champion before MMA"},{icon:"💪",text:"Beat Masvidal, Covington, Burns — the WW era"}]},
 {name:"Ciryl Gane",fullName:"Ciryl Gane",nick:"Bon Gamin",wc:"HW",gender:"M",height:'6\'5"',weightLbs:248,discipline:"Muay Thai / MMA",rec:"14-2",w:14,l:2,streak:5,ufc:true,titles:1,org:"MMA",init:"CGw",striking:94,wrestling:80,power:90,chin:88,stamina:92,defense:90,submission:72,durability:88,age:36,country:"France",reach:'81\"',finishes:9,kos:6,subs:3,tier:"PRIME",rare:true,primeNote:"Title-winning night — captured the heavyweight title in front of the President, peak technical striking and footwork",accolades:[{icon:"🏆",text:"Heavyweight Champion — won the belt at the historic White House card"},{icon:"🇫🇷",text:"French Muay Thai specialist, undefeated kickboxing background"},{icon:"⚡",text:"Most technically refined heavyweight striker of his era"}]},
 {name:"Charles Oliveira",fullName:"Charles do Bronx Oliveira",nick:"Do Bronx",wc:"LW",gender:"M",height:'5\'10"',weightLbs:155,discipline:"BJJ / Boxing",rec:"35-10",w:35,l:10,streak:3,ufc:true,titles:1,org:"MMA",init:"CO2",striking:89,wrestling:91,power:81,chin:78,stamina:83,defense:79,submission:99,durability:78,age:37,country:"Brazil",reach:'74"',finishes:31,kos:10,subs:21,tier:"S"},
 {name:"Cain Velasquez",fullName:"Cain Velasquez",nick:"",wc:"HW",gender:"M",height:'6\'1"',weightLbs:240,discipline:"Wrestling / Boxing",rec:"14-3",w:14,l:3,streak:8,ufc:true,titles:1,org:"MMA",init:"CV",striking:83,wrestling:95,power:85,chin:85,stamina:96,defense:88,submission:91,durability:86,legacyOverride:178,age:43,country:"USA",reach:'77\"',finishes:12,kos:10,subs:2,tier:"PRIME",rare:true},
@@ -998,7 +1041,7 @@ const FIGHTERS=[
 {name:"Kevin Vallejos",fullName:"Kevin Axel Vallejos",nick:"El Chino",wc:"FW",gender:"M",height:'5\'7"',weightLbs:145,discipline:"Boxing / Muay Thai",rec:"18-1",w:18,l:1,streak:4,ufc:true,titles:0,org:"MMA",init:"KV",striking:86,wrestling:74,power:90,chin:80,stamina:80,defense:78,submission:74,durability:80,age:24,country:"Argentina",reach:'69"',finishes:12,kos:9,subs:3,tier:"C"},
 {name:"Aaron Pico",fullName:"Aaron Pico",nick:"",wc:"FW",gender:"M",height:'5\'7"',weightLbs:145,discipline:"Wrestling / Boxing",rec:"13-4",w:13,l:4,streak:4,ufc:true,titles:0,org:"MMA",init:"AP2",striking:86,wrestling:90,power:90,chin:78,stamina:80,defense:78,submission:72,durability:78,age:30,country:"USA",reach:'70"',finishes:10,kos:7,subs:3,tier:"C"},
 {name:"Frankie Edgar",fullName:"Frankie Edgar",nick:"The Answer",wc:"LW",gender:"M",height:'5\'6"',weightLbs:155,discipline:"Wrestling / Boxing",rec:"24-11-1",w:24,l:11,streak:0,ufc:true,titles:1,org:"MMA",init:"FE",striking:86,wrestling:90,power:78,chin:90,stamina:94,defense:86,submission:78,durability:90,legacyOverride:177,age:44,country:"USA",reach:'68"',finishes:11,kos:5,subs:6,tier:"PRIME",rare:true},
-{name:"Kamaru Usman",fullName:"Kamaru Usman",nick:"",wc:"MW",gender:"M",height:'6\'0"',weightLbs:185,discipline:"Wrestling / Boxing",rec:"21-4",w:21,l:4,streak:0,ufc:true,titles:0,org:"MMA",init:"KUm",striking:86,wrestling:92,power:84,chin:86,stamina:88,defense:86,submission:74,durability:86,legacyOverride:177,age:39,country:"Nigeria",reach:'76"',finishes:10,kos:5,subs:5,tier:"PRIME",rare:true},
+{name:"Kamaru Usman",fullName:"Kamaru Usman",nick:"",wc:"MW",gender:"M",height:'6\'0"',weightLbs:185,discipline:"Wrestling / Boxing",rec:"21-4",w:21,l:4,streak:0,ufc:true,titles:0,org:"MMA",init:"KUm",striking:86,wrestling:92,power:84,chin:86,stamina:88,defense:86,submission:74,durability:86,legacyOverride:177,age:39,country:"Nigeria",reach:'76"',finishes:10,kos:5,subs:5,tier:"B"},
 {name:"Mario Bautista",fullName:"Mario Bautista",nick:"",wc:"BW",gender:"M",height:'5\'8"',weightLbs:135,discipline:"BJJ / Boxing",rec:"17-3",w:17,l:3,streak:7,ufc:true,titles:0,org:"MMA",init:"MB2",striking:82,wrestling:80,power:78,chin:80,stamina:84,defense:80,submission:82,durability:80,age:32,country:"USA",reach:'69"',finishes:10,kos:6,subs:4,tier:"C"},
 {name:"Deiveson Figueiredo",fullName:"Deiveson Figueiredo",nick:"",wc:"BW",gender:"M",height:'5\'5"',weightLbs:135,discipline:"BJJ / Boxing",rec:"25-7-1",w:25,l:7,streak:0,ufc:true,titles:0,org:"MMA",init:"DFb",striking:86,wrestling:80,power:90,chin:82,stamina:80,defense:82,submission:86,durability:82,age:39,country:"Brazil",reach:'68"',finishes:18,kos:9,subs:9,tier:"B"},
 {name:"Carlos Ulberg",fullName:"Carlos Ulberg",nick:"",wc:"LHW",gender:"M",height:'6\'4"',weightLbs:205,discipline:"Kickboxing",rec:"13-1",w:13,l:1,streak:8,ufc:true,titles:1,org:"MMA",init:"CU",striking:94,wrestling:76,power:93,chin:84,stamina:84,defense:84,submission:70,durability:84,legacyOverride:177,age:35,country:"New Zealand",reach:'77\"',finishes:11,kos:7,subs:4,tier:"CHAMPION",rare:true},
@@ -1080,7 +1123,10 @@ const FIGHTERS=[
 {name:"Jim Miller",fullName:"Jim Miller",nick:"",wc:"LW",gender:"M",height:'5\'8"',weightLbs:155,discipline:"MMA",rec:"39-19",w:39,l:19,streak:0,ufc:true,titles:0,org:"MMA",init:"JMl",age:43,country:"USA",reach:'71"',finishes:30,kos:6,subs:24,striking:82,wrestling:82,power:80,chin:80,stamina:82,defense:80,submission:88,durability:80,legacyOverride:176,tier:"PRIME",rare:true},
 {name:"Joe Lauzon",fullName:"Joe Lauzon",nick:"J-Lau",wc:"LW",gender:"M",height:'5\'10"',weightLbs:155,discipline:"MMA",rec:"28-16",w:28,l:16,streak:0,ufc:true,titles:0,org:"MMA",init:"JLl",age:42,country:"USA",reach:'71"',finishes:26,kos:8,subs:18,striking:80,wrestling:80,power:80,chin:78,stamina:80,defense:78,submission:90,durability:78,legacyOverride:176,tier:"PRIME",rare:true},
 {name:"Paul Felder",fullName:"Paul Felder",nick:"The Irish Dragon",wc:"LW",gender:"M",height:'5\'11"',weightLbs:155,discipline:"MMA",rec:"17-6",w:17,l:6,streak:0,ufc:true,titles:0,org:"MMA",init:"PFl",age:41,country:"USA",reach:'70"',finishes:10,kos:10,subs:0,striking:88,wrestling:76,power:88,chin:80,stamina:80,defense:78,submission:76,durability:80,legacyOverride:176,tier:"PRIME",rare:true},
-{name:"Frank Mir",fullName:"Frank Mir",nick:"",wc:"HW",gender:"M",height:'6\'3"',weightLbs:240,discipline:"Brazilian Jiu-Jitsu",rec:"19-13",w:19,l:13,streak:0,ufc:true,titles:1,org:"MMA",init:"FM",age:47,country:"USA",reach:'80"',finishes:16,kos:3,subs:13,striking:78,wrestling:78,power:82,chin:76,stamina:76,defense:78,submission:94,durability:78,legacyOverride:176,tier:"PRIME",rare:true}
+{name:"Frank Mir",fullName:"Frank Mir",nick:"",wc:"HW",gender:"M",height:'6\'3"',weightLbs:240,discipline:"Brazilian Jiu-Jitsu",rec:"19-13",w:19,l:13,streak:0,ufc:true,titles:1,org:"MMA",init:"FM",age:47,country:"USA",reach:'80"',finishes:16,kos:3,subs:13,striking:78,wrestling:78,power:82,chin:76,stamina:76,defense:78,submission:94,durability:78,legacyOverride:176,tier:"PRIME",rare:true},
+{name:"Jared Cannonier",fullName:"Jared Cannonier",nick:"The Killa Gorilla",wc:"MW",gender:"M",height:'5\'11"',weightLbs:185,discipline:"Boxing / Wrestling",rec:"18-9",w:18,l:9,streak:0,ufc:true,titles:0,org:"MMA",init:"JCn",age:42,country:"USA",reach:'77.5"',finishes:13,kos:11,subs:2,striking:88,wrestling:78,power:92,chin:84,stamina:78,defense:78,submission:62,durability:82,tier:"B"},
+{name:"Darren Till",fullName:"Darren Till",nick:"The Gorilla",wc:"MW",gender:"M",height:'6\'0"',weightLbs:185,discipline:"Muay Thai / Boxing",rec:"19-5-1",w:19,l:5,streak:0,ufc:true,titles:0,org:"MMA",init:"DT",age:33,country:"England",reach:'74"',finishes:11,kos:7,subs:4,striking:90,wrestling:72,power:86,chin:80,stamina:80,defense:80,submission:68,durability:80,tier:"C"},
+{name:"Cung Le",fullName:"Cung Le",nick:"",wc:"MW",gender:"M",height:'5\'10"',weightLbs:185,discipline:"Sanshou / Kickboxing",rec:"9-3",w:9,l:3,streak:0,ufc:true,titles:1,org:"MMA",init:"CuL",age:53,country:"Vietnam/USA",reach:'72"',finishes:7,kos:6,subs:1,striking:92,wrestling:74,power:88,chin:78,stamina:76,defense:78,submission:60,durability:78,tier:"C"}
 ];
 const OPPS=[
 // ── LHW 205 ──
@@ -1795,6 +1841,20 @@ function currentDraftWc(){
 function divisionChoices(){
   const wc=currentDraftWc();
   const unlockedElite=(f)=>unlockedFighters.has(f.name)||passwordUnlocked;
+  // OPENWEIGHT: draw from ALL weight classes (no wc restriction), excluding already-drafted fighters
+  if(OPENWEIGHT_ON()){
+    const taken=new Set(G.roster.map(f=>f.name+f.wc));
+    let pool=shuf(FIGHTERS.filter(f=>!f.secret&&!taken.has(f.name+f.wc)));
+    return pool.slice(0,4);
+  }
+  // SALARY CAP: only offer fighters in this division you can still afford
+  if(GAME_MODE==='salary'){
+    const rem=capRemaining();
+    let affordable=FIGHTERS.filter(f=>f.wc===wc&&!f.secret&&fighterCost(f)<=rem);
+    // guarantee at least the cheapest options remain pickable
+    if(affordable.length<2){affordable=FIGHTERS.filter(f=>f.wc===wc&&!f.secret).sort((a,b)=>fighterCost(a)-fighterCost(b)).slice(0,4);}
+    return shuf(affordable).slice(0,4);
+  }
   // GOD MODE: only PRIME, S, and GOAT fighters are offered.
   if(GAME_MODE==='god'){
     let pool=shuf(challengePool(FIGHTERS.filter(f=>f.wc===wc&&(f.tier==='GOAT'||f.tier==='PRIME'||f.tier==='S')&&!f.secret)));
@@ -1866,7 +1926,7 @@ function renderDraft(){
  if(missing.length>0){
  document.getElementById('trivia-zone').innerHTML=`<div class="s-warning" style="margin-bottom:.9rem">⚠ Your roster is missing these weight classes: <b>${missing.map(wc=>wcLabel(wc)).join(', ')}</b>.<br>You must have at least one fighter from every division to enter the octagon.</div><p style="font-size:11px;color:var(--text3)">Tip: in Endless Draft you can keep collecting; in a normal run, this roster can't compete until every division is covered.</p>`;
  } else {
- document.getElementById('trivia-zone').innerHTML=`<div style="background:var(--green-bg);color:var(--green-text);border-radius:var(--radius);padding:8px 12px;margin-bottom:.7rem;font-size:12px;font-weight:600;text-align:center">✓ All ${REQUIRED_WC.length} weight classes covered!</div><p style="font-size:13px;color:var(--text2);margin-bottom:.9rem">29 fighters locked. See how your roster performs.</p>${(()=>{const g=rosterGrade();return `<div style="background:var(--bg2);border-radius:var(--radius);padding:1rem;margin-bottom:.9rem;text-align:center"><div style="font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--text3);margin-bottom:2px">Roster Grade</div><div style="font-size:46px;font-weight:800;line-height:1;color:${g.color};margin:4px 0">${g.grade}</div><div style="font-size:11px;color:var(--text3);margin-bottom:.6rem">team score ${g.sum}</div><div style="font-size:12px;color:var(--text2);line-height:1.5;text-align:left">${scoutingReport()}</div></div>`;})()}<button class="btn btn-primary" onclick="startFights()">\u2192 Get final record</button>`;
+ document.getElementById('trivia-zone').innerHTML=`<div style="background:var(--green-bg);color:var(--green-text);border-radius:var(--radius);padding:8px 12px;margin-bottom:.7rem;font-size:12px;font-weight:600;text-align:center">✓ All ${requiredDivisions().length} weight classes covered!</div><p style="font-size:13px;color:var(--text2);margin-bottom:.9rem">29 fighters locked. See how your roster performs.</p>${(()=>{const g=rosterGrade();return `<div style="background:var(--bg2);border-radius:var(--radius);padding:1rem;margin-bottom:.9rem;text-align:center"><div style="font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--text3);margin-bottom:2px">Roster Grade</div><div style="font-size:46px;font-weight:800;line-height:1;color:${g.color};margin:4px 0">${g.grade}</div><div style="font-size:11px;color:var(--text3);margin-bottom:.6rem">team score ${g.sum}</div><div style="font-size:12px;color:var(--text2);line-height:1.5;text-align:left">${scoutingReport()}</div></div>`;})()}<button class="btn btn-primary" onclick="startFights()">\u2192 Get final record</button>`;
  }
  }
  return;
@@ -1878,7 +1938,7 @@ function renderDraft(){
  PICK_MAP._m={};
  let choices=divisionChoices();
  const wc=currentDraftWc();
- const reqNote=`<div style="background:var(--purple-bg);color:var(--purple-text);border-radius:var(--radius);padding:8px 12px;margin-bottom:.7rem;font-size:12px;font-weight:700;text-align:center">⚖️ ${wcLabel(wc)} Division — pick one (${G.roster.length+1} of ${REQUIRED_WC.length})</div>`;
+ const reqNote=`<div style="background:var(--purple-bg);color:var(--purple-text);border-radius:var(--radius);padding:8px 12px;margin-bottom:.7rem;font-size:12px;font-weight:700;text-align:center">${OPENWEIGHT_ON()?'🏋️ Openweight — pick any fighter':'⚖️ '+wcLabel(wc)+' Division'} — pick one (${G.roster.length+1} of ${requiredDivisions().length})</div>${GAME_MODE==='salary'?`<div style="background:var(--green-bg);color:var(--green-text);border-radius:var(--radius);padding:6px 12px;margin-bottom:.7rem;font-size:12px;font-weight:700;text-align:center">💰 Budget: $${capRemaining()} left of $${SALARY_CAP} &nbsp;·&nbsp; spent $${rosterSpent()}</div>`:''}${MYSTERY_ON()?`<div style="background:var(--bg3);color:var(--text2);border-radius:var(--radius);padding:6px 12px;margin-bottom:.7rem;font-size:11px;text-align:center">🎭 Identities hidden — pick by the numbers. All revealed at the end!</div>`:''}`;
  document.getElementById('trivia-zone').innerHTML=reqNote+`<p class="pick-header" style="margin-bottom:8px">Choose your ${wcLabel(wc)} fighter:</p><div class="pick-grid">${choices.map((f,i2)=>buildCard(f,i2)).join('')}</div>`+nextBtn()+rerollBtn();
  };
  G._rerollFn=renderCasualPicks;
@@ -1919,9 +1979,24 @@ function handleAnswer(chosen,q){
  renderTriviaPicks(choices);
  zone.appendChild(div);
 }
+function pcRecLine(f){
+  // Mystery mode: show record + finishes + KOs, hide weight class
+  if(MYSTERY_ON()){
+    let parts=[f.rec||'—'];
+    if(f.finishes!==undefined)parts.push(f.finishes+' fin');
+    if(f.kos!==undefined)parts.push(f.kos+' KO');
+    return parts.join(' · ')+' · ? lbs';
+  }
+  // Normal: show record + KO in easy mode only, then weight class
+  let pre='';
+  if(!TRIVIA_ON&&!f.hideRec&&f.rec){
+    pre=f.rec+(f.kos!==undefined?' · '+f.kos+' KO':'')+' · ';
+  }
+  return pre+wcLabel(f.wc);
+}
 function buildCard(f,i){
  if(!f)return '';
- const noOut=f.noOutline;const ig=!noOut&&(f.tier==='GOAT'||f.tier==='SECRET'),ip=!noOut&&f.tier==='PRIME',ic=!noOut&&f.tier==='CHAMPION',isSec=f.secret;
+ const noOut=f.noOutline;const ig=!noOut&&f.tier==='GOAT',ip=!noOut&&f.tier==='PRIME',ic=!noOut&&f.tier==='CHAMPION',isSec=f.secret;
  const av=avStyle(f)||avColor(i);
  const leg=calcLegacy(f,3,GAME_MODE);
  const perkTags='';
@@ -1933,8 +2008,8 @@ function buildCard(f,i){
  const lockNote=!eligible?`<div style="font-size:8px;color:var(--red-text);background:var(--red-bg);border-radius:4px;padding:1px 4px;margin-top:3px;text-align:center">${wcLabel(f.wc)} already drafted</div>`:'';
  return `<div class="pick-card${ig?' goat-card':ip?' prime-card':ic?' champion-card':''}${eligible?'':' pick-greyed'}" ${eligible?`onclick="selectPick('${key}')" data-pickkey="${key}"`:'style="opacity:.35;cursor:not-allowed;pointer-events:none"'}>
  <div class="pc-av" style="${av}">${fIcon(f)}</div>
- <div class="pc-name">${f.name}</div>
- <div class="pc-rec">${!TRIVIA_ON&&!f.hideRec&&f.rec?`${f.rec}${f.kos!==undefined?` · ${f.kos} KO`:''} · `:''}${wcLabel(f.wc)}</div>${lockNote}
+ <div class="pc-name">${MYSTERY_ON()?'??? Mystery Fighter':f.name}${GAME_MODE==='salary'?` <span style="color:var(--green-text);font-weight:800">· $${fighterCost(f)}</span>`:''}</div>
+ <div class="pc-rec">${pcRecLine(f)}</div>${lockNote}
  <div style="text-align:center;margin-top:2px"></div>
  
  <div style="font-size:9px;color:var(--text3);margin-top:5px;text-align:center">${f.height||''}${f.weightLbs?` · ${f.weightLbs} lbs`:''}</div>
@@ -2424,7 +2499,7 @@ function showFinal(perfect){
  const gc=G.roster.filter(f=>f.tier==='GOAT').length,pc=G.roster.filter(f=>f.tier==='PRIME').length,sc=G.roster.filter(f=>f.tier==='S').length,secC=G.roster.filter(f=>f.tier==='SECRET').length;
  let msg=perfect?`<p style="font-size:13px;line-height:1.75;margin-bottom:.9rem">Undefeated. ${gc} GOAT. ${pc} PRIME. ${secC>0?secC+' SECRET. ':''}Perfect 29-0.</p>`:`<p style="font-size:13px;line-height:1.75;margin-bottom:.9rem">${false?``:G.wins>=27?`${G.wins}-${G.losses} \u2014 agonizingly close to perfection.`:G.wins>=22?`${G.wins}-${G.losses} \u2014 a dominant run.`:G.wins>=15?`${G.wins}-${G.losses} \u2014 a solid showing.`:G.wins>=8?`${G.wins}-${G.losses} \u2014 a respectable result.`:`${G.wins}-${G.losses} \u2014 tough slate.`}</p>${G._endlessChampion&&G.wins>=100?`<div style="background:var(--gold-bg);color:var(--gold-text);border-radius:var(--radius);padding:.7rem;margin-bottom:.9rem;font-size:12px;font-weight:600">🏆 You earned the 100-0 Trophy this run — a perfect century!</div>`:''}`;
  document.getElementById('final-body').innerHTML=msg+(ACTIVE_CHALLENGE?(()=>{const beat=G.wins>=ACTIVE_CHALLENGE.target;return `<div style="background:${beat?'var(--mint-bg)':'var(--bg2)'};border:2px solid ${beat?'var(--mint)':'var(--border)'};border-radius:var(--radius);padding:.9rem;margin-bottom:.9rem;text-align:center"><div style="font-size:13px;font-weight:700;color:${beat?'var(--mint-text)':'var(--text)'}">${ACTIVE_CHALLENGE.icon} ${ACTIVE_CHALLENGE.name} — ${beat?'CHALLENGE COMPLETE! 🎉':'Challenge Failed'}</div><div style="font-size:11px;color:var(--text3);margin-top:3px">Target: beat ${ACTIVE_CHALLENGE.target}-${29-ACTIVE_CHALLENGE.target} · You went ${G.wins}-${G.losses}${beat?' ✓':''}</div></div>`;})():'')+(newAchievements&&newAchievements.length?`<div style="background:var(--gold-bg);border-radius:var(--radius);padding:.8rem;margin-bottom:.9rem"><div style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--gold-text);font-weight:700;margin-bottom:.5rem">🎉 Achievement${newAchievements.length>1?'s':''} Unlocked</div>${newAchievements.map(a=>`<div style="display:flex;align-items:center;gap:8px;padding:3px 0"><span style="font-size:20px">${a.icon}</span><span style="font-size:13px"><b style="color:var(--gold-text)">${a.name}</b> <span style="color:var(--text2);font-size:11px">— ${a.desc}</span></span></div>`).join('')}</div>`:'')+`<div class="final-squad-list" style="background:var(--bg2);border-radius:var(--radius);padding:.8rem 1rem;margin-bottom:1rem;text-align:left">
-<div style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text3);margin-bottom:.5rem;font-weight:700">Your Drafted Squad</div>
+<div style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text3);margin-bottom:.5rem;font-weight:700">${MYSTERY_ON()?'🎭 Identities Revealed!':'Your Drafted Squad'}</div>
 ${G.roster.map(f=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--bg3);font-size:13px">
 <span><b style="color:${f.tier==='GOAT'?'var(--gold-text)':f.tier==='PRIME'?'var(--purple-text)':'var(--text)'}">${f.name}</b></span>
 <span style="font-size:11px;color:var(--text3)">${wcLabel(f.wc)}</span></div>`).join('')}
@@ -2581,12 +2656,13 @@ function renderDB(){
  grid.innerHTML=visible.map(f=>{const gi=FIGHTERS.indexOf(f);const unlocked=true; // all fighters always available
  // GOAT fighters are always shown; PRIME, SECRET, and others hidden until unlocked via trivia/draft or password
  const isLocked=!unlocked;const isSec=isLocked;const ig=f.tier==='GOAT'||f.tier==='SECRET',ip=f.tier==='PRIME';const leg=calcLegacy(f,3);
- return `<div class="db-card${unlocked?'':' locked'}" onclick="openFighterModal(${gi})"><div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><div style="width:28px;height:28px;border-radius:50%;${avStyle(f)||'background:var(--bg3);color:var(--text2)'};font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${fIcon(f)}</div><div style="flex:1;min-width:0"><div class="db-card-name">${f.name}</div><div class="db-card-sub">${isSec?'Draft this fighter to add them to your collection':wcLabel(f.wc)+(f.height?' \u00b7 '+f.height:'')}</div></div>${isSec?'':``}</div>${isSec?`<div style="font-size:9px;color:var(--text3);font-style:italic">Locked — draft to reveal</div>`:`<div style="font-size:10px;color:var(--text2);margin-top:4px">Record: <b style="color:var(--text)">${f.rec||'—'}</b></div><div style="font-size:9px;color:var(--text3);margin-top:2px">${f.height||''}${f.weightLbs?' \u00b7 '+f.weightLbs+' lbs':''}</div>`}</div>`;
+ return `<div class="db-card${unlocked?'':' locked'}" onclick="openFighterModal(${gi})"><div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><div style="width:28px;height:28px;border-radius:50%;${avStyle(f)||'background:var(--bg3);color:var(--text2)'};font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${fIcon(f)}</div><div style="flex:1;min-width:0"><div class="db-card-name">${f.name}</div><div class="db-card-sub">${wcLabel(f.wc)+(f.height?' \u00b7 '+f.height:'')}</div></div>${isSec?'':``}</div>${`<div style="font-size:10px;color:var(--text2);margin-top:4px">Record: <b style="color:var(--text)">${f.rec||'—'}</b></div><div style="font-size:9px;color:var(--text3);margin-top:2px">${f.height||''}${f.weightLbs?' \u00b7 '+f.weightLbs+' lbs':''}</div>`}</div>`;
  }).join('');
 }
 
 // Populate challenge dropdown on load
 try{populateChallenges();}catch(e){}
+try{selectMode('normal');}catch(e){}
 
 // Hidden password unlock — type 29-0 anywhere
 (function(){let buf='';document.addEventListener('keydown',e=>{buf=(buf+e.key).slice(-4);if(buf==='29-0'||buf.toLowerCase()==='29-0'){passwordUnlocked=true;localStorage.setItem('29_pw','true');FIGHTERS.forEach(f=>{if(f.secret)unlockedFighters.add(f.name);});saveUnlocked();if(document.getElementById('main-db').classList.contains('active'))renderDB();}});})();
