@@ -20,8 +20,8 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="29-0 · MMA Fighter Draft">
 <meta property="og:description" content="Draft an all-time MMA roster and try to go a perfect 29-0. Can you build a team that never loses?">
-<meta property="og:url" content="https://29and0mmadraft.com">
-<meta property="og:image" content="https://29and0mmadraft.com/preview.png">
+<meta property="og:url" content="https://29-0mmadraft.com">
+<meta property="og:image" content="https://29-0mmadraft.com/preview.png">
 <meta property="og:site_name" content="29-0 MMA Draft">
 <!-- Twitter / X Card -->
 <meta name="twitter:card" content="summary_large_image">
@@ -29,7 +29,7 @@
 <meta name="twitter:creator" content="@29and0mmadraft">
 <meta name="twitter:title" content="29-0 · MMA Fighter Draft">
 <meta name="twitter:description" content="Draft an all-time MMA roster and try to go a perfect 29-0. Can you build a team that never loses?">
-<meta name="twitter:image" content="https://29and0mmadraft.com/preview.png">
+<meta name="twitter:image" content="https://29-0mmadraft.com/preview.png">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap');
 
@@ -198,6 +198,14 @@ body {
 .pick-card.prime-card { border:2px solid var(--purple); }
 .champion-card { border:2px solid var(--mint); }
 .pc-av { width:36px; height:36px; border-radius:50%; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; margin:0 auto 5px; }
+/* Flag IMAGE avatars: the flag fills the circular avatar and is clipped round. Works on all platforms incl. Windows. */
+.flag-img { width:100%; height:100%; object-fit:cover; border-radius:50%; display:block; }
+.flag-round { display:flex; align-items:center; justify-content:center; width:100%; height:100%; border-radius:50%; overflow:hidden; line-height:1; font-size:1.6em; }
+.flag-none { font-size:1.5em; }
+.pc-av, .mini-av { overflow:hidden; background:var(--bg3); padding:0; }
+.db-card .pc-av, .modal-av { overflow:hidden; }
+/* DB + modal avatar circles also clip the flag */
+.db-card .pc-av, .modal-av { overflow:hidden; }
 .pc-name { font-size:11px; font-weight:700; text-align:center; line-height:1.3; }
 
 .pc-rec { font-size:9px; color:var(--text3); text-align:center; margin-top:2px; }
@@ -688,9 +696,7 @@ const CHALLENGES=[
  {id:'era_2010s',icon:'📱',name:'2010s Generation',desc:'Openweight — draft 12 fighters from the 2010s, any weight class',target:22,openweight:true,
    filter:f=>f.era==='2010s'},
  {id:'era_2000s',icon:'📼',name:'2000s Golden Age',desc:'Openweight — draft 12 fighters from the 2000s, any weight class',target:20,openweight:true,
-   filter:f=>f.era==='2000s'},
- {id:'era_pioneer',icon:'🏛️',name:'Pioneers',desc:'Openweight — draft 12 legends who built the sport, any weight class',target:14,openweight:true,
-   filter:f=>f.era==='PIONEER'}
+   filter:f=>f.era==='2000s'}
 ];
 function challengePool(wcPool){
  if(!ACTIVE_CHALLENGE)return wcPool;
@@ -1392,11 +1398,20 @@ function eraBadge(f){
  const st=colors[f.era]||'background:var(--bg3);color:var(--text2)';
  return `<span style="${st};font-size:8px;font-weight:800;padding:1px 5px;border-radius:8px;letter-spacing:.03em">${lbl}</span>`;
 }
+const COUNTRY_FLAGS={"Angola":"ao","Argentina":"ar","Armenia":"am","Australia":"au","Austria":"at","Azerbaijan":"az","Bahamas/USA":"us","Belarus":"by","Brazil":"br","Cameroon":"cm","Canada":"ca","China":"cn","Croatia":"hr","Cuba":"cu","Czech Republic":"cz","Denmark":"dk","Ecuador":"ec","England":"gb-eng","France":"fr","Georgia":"ge","Georgia/Spain":"ge","Iraq":"iq","Ireland":"ie","Italy":"it","Japan":"jp","Kazakhstan":"kz","Kyrgyzstan":"kg","Mexico":"mx","Moldova":"md","Myanmar":"mm","Netherlands":"nl","New Zealand":"nz","Nigeria":"ng","Poland":"pl","Russia":"ru","Scotland":"gb-sct","South Africa":"za","South Korea":"kr","Spain/Georgia":"es","Sweden":"se","UAE":"ae","USA":"us","Vietnam/USA":"vn"};
+function flagCode(f){
+ // ISO code (flagcdn) of the fighter's home country; first country for dual-nationality.
+ if(!f||!f.country)return '';
+ return COUNTRY_FLAGS[f.country]||'';
+}
 function fIcon(f){
- // Tier is shown via the card's colored outline (GOAT=gold, PRIME=purple).
- // The avatar just shows weight-class initials for everyone.
- const wcInit={HW:'HW',LHW:'LH',MW:'MW',WW:'WW',LW:'LW',FW:'FW',BW:'BW',FLW:'FL',WSTRAW:'SW',WFLW:'WF',WBW:'WB',WFW:'WF'};
- return wcInit[f.wc]||f.wc;
+ // Avatar shows a round flag IMAGE of the fighter's home country (works on every platform,
+ // including Windows where emoji flags don't render). The image fills a circular,
+ // overflow-hidden avatar container so it reads as a round flag.
+ const code=flagCode(f);
+ if(!code) return `<span class="flag-round flag-none">🏳️</span>`;
+ const cc=(f.country||'').replace(/"/g,'');
+ return `<img class="flag-img" loading="lazy" alt="${cc}" src="https://flagcdn.com/w160/${code}.png" onerror="this.style.display='none';this.parentNode&&(this.parentNode.textContent='${code.slice(0,2).toUpperCase()}')">`;
 }
 // Locked-aware icon (for DB / modal where secret/prime hide until unlocked)
 function fIconLocked(f,isLocked){
@@ -2152,17 +2167,39 @@ function startFights(){
 // Going 29-0 requires a near-perfect, GOAT-stacked roster.
 // ════ ACHIEVEMENTS ════
 const ACHIEVEMENTS=[
+ // ── Core ──
  {id:'first_run',icon:'🥊',name:'First Blood',desc:'Complete your first run'},
  {id:'perfect',icon:'🏆',name:'Perfect Season',desc:'Go a perfect 29-0'},
  {id:'winless',icon:'💀',name:'Rock Bottom',desc:'Go a perfect 0-29 — pure futility'},
  {id:'all_goats',icon:'🐐',name:'GOAT Farm',desc:'Draft 8+ GOAT-tier fighters in one roster'},
  {id:'no_goats_20',icon:'🐶',name:'Underdog Story',desc:'Win 20+ fights with zero GOATs on your roster'},
  {id:'all_finishers',icon:'💥',name:'All Finishers',desc:'Draft a roster averaging 88+ power'},
- {id:'women_goats',icon:'👑',name:'Queens of the Cage',desc:'Draft a GOAT in all 4 women\'s divisions'},
+ {id:'women_goats',icon:'👑',name:'Queens of the Cage',desc:'Draft a PRIME-or-better fighter in all 4 women\'s divisions'},
  {id:'grade_s',icon:'⭐',name:'Flawless Draft',desc:'Earn an S-grade roster'},
  {id:'comeback',icon:'📈',name:'Climbing',desc:'Beat your previous best record'},
  {id:'ten_runs',icon:'🔟',name:'Seasoned',desc:'Complete 10 total runs'},
- {id:'god_mode',icon:'⚡',name:'Among Gods',desc:'Complete a run in God Mode'}
+ // ── Game modes ──
+ {id:'mode_salary',icon:'💰',name:'Bargain Hunter',desc:'Win 20+ in Salary Cap mode'},
+ {id:'mode_openweight',icon:'🏋️',name:'No Limits',desc:'Complete a run in Openweight mode'},
+ {id:'mode_mystery',icon:'🎭',name:'Blind Faith',desc:'Win 20+ in Mystery Draft mode'},
+ {id:'god_mode',icon:'⚡',name:'Among Gods',desc:'Complete a run in God Mode'},
+ {id:'mode_master',icon:'🎮',name:'Mode Master',desc:'Complete a run in every game mode (Normal, Salary, Openweight, Mystery)'},
+ // ── Challenges ──
+ {id:'chal_first',icon:'🎯',name:'Challenger',desc:'Beat the target on any challenge'},
+ {id:'chal_brazil',icon:'🇧🇷',name:'Brazilian Blitz',desc:'Beat the Brazilian Blitz challenge'},
+ {id:'chal_usa',icon:'🇺🇸',name:'Team USA',desc:'Beat the Team USA challenge'},
+ {id:'chal_russia',icon:'🇷🇺',name:'Russian Machine',desc:'Beat the Russian Machine challenge'},
+ {id:'chal_finishers',icon:'💢',name:'Knockout Artists',desc:'Beat the Knockout Artists challenge'},
+ {id:'chal_grapplers',icon:'🤼',name:'Submission Squad',desc:'Beat the Submission Squad challenge'},
+ {id:'chal_nogoat',icon:'🐕',name:'No GOATs Allowed',desc:'Beat the No GOATs Allowed challenge'},
+ {id:'chal_veterans',icon:'👴',name:'Old Guard',desc:'Beat the Old Guard challenge'},
+ {id:'chal_youngguns',icon:'⚡',name:'Young Guns',desc:'Beat the Young Guns challenge'},
+ {id:'chal_newblood',icon:'🌱',name:'New Blood',desc:'Beat the New Blood challenge'},
+ {id:'chal_underdogs',icon:'🥊',name:'Underdog Army',desc:'Beat the Underdog Army challenge'},
+ {id:'chal_era_modern',icon:'🔮',name:'Modern Era',desc:'Beat the Modern Era (2020s) challenge'},
+ {id:'chal_era_2010s',icon:'📱',name:'2010s Generation',desc:'Beat the 2010s Generation challenge'},
+ {id:'chal_era_2000s',icon:'📼',name:'2000s Golden Age',desc:'Beat the 2000s Golden Age challenge'},
+ {id:'chal_master',icon:'👑',name:'Challenge Conqueror',desc:'Beat the target on every challenge'}
 ];
 function getAchievements(){try{return JSON.parse(localStorage.getItem('29_ach')||'[]');}catch(e){return [];}}
 function getBestWins(){return parseInt(localStorage.getItem('29_best')||'0');}
@@ -2174,28 +2211,52 @@ function earnAchievement(id){
  return ACHIEVEMENTS.find(a=>a.id===id);
 }
 // Check all achievements after a run; returns array of NEWLY earned ones
+// Track which game modes have been completed and which challenges have been beaten (persisted)
+function getModeSet(){try{return new Set(JSON.parse(localStorage.getItem('29_modes_done')||'[]'));}catch(e){return new Set();}}
+function saveModeSet(s){localStorage.setItem('29_modes_done',JSON.stringify([...s]));}
+function getChalSet(){try{return new Set(JSON.parse(localStorage.getItem('29_chals_done')||'[]'));}catch(e){return new Set();}}
+function saveChalSet(s){localStorage.setItem('29_chals_done',JSON.stringify([...s]));}
 function checkAchievements(){
  const newly=[];
  const w=G.wins, l=G.losses, perfect=(w>=29&&l===0);
  const goats=G.roster.filter(f=>f.tier==='GOAT').length;
  const avgPower=G.roster.reduce((s,f)=>s+(f.power||0),0)/G.roster.length;
- const wGoats=['WSTRAW','WFLW','WBW','WFW'].filter(wc=>G.roster.some(f=>f.wc===wc&&f.tier==='GOAT')).length;
+ // Elite (Champion or GOAT) fighter in each of the 4 women's divisions — winnable since not every women's division has a GOAT
+ const eliteTiers=['GOAT','CHAMPION','PRIME'];const wElite=['WSTRAW','WFLW','WBW','WFW'].filter(wc=>G.roster.some(f=>f.wc===wc&&eliteTiers.includes(f.tier))).length;
  const grade=rosterGrade().grade;
  const prevBest=getBestWins();
- // run count
  const runs=getRunCount()+1; localStorage.setItem('29_runs',String(runs));
  const tryEarn=(cond,id)=>{if(cond){const a=earnAchievement(id);if(a)newly.push(a);}};
+ // ── Core ──
  tryEarn(true,'first_run');
  tryEarn(perfect,'perfect');
  tryEarn(w===0&&l===29,'winless');
  tryEarn(goats>=8,'all_goats');
  tryEarn(goats===0&&w>=20,'no_goats_20');
  tryEarn(avgPower>=88,'all_finishers');
- tryEarn(wGoats>=4,'women_goats');
+ tryEarn(wElite>=4,'women_goats');
  tryEarn(grade==='S','grade_s');
  tryEarn(w>prevBest&&prevBest>0,'comeback');
  tryEarn(runs>=10,'ten_runs');
+ // ── Game modes ──
+ // Determine the effective mode for this run (era challenges force openweight, but count as their own challenge below)
+ const baseMode=ACTIVE_CHALLENGE?(ACTIVE_CHALLENGE.openweight?'openweight':'normal'):GAME_MODE;
+ tryEarn(GAME_MODE==='salary'&&w>=20,'mode_salary');
+ tryEarn(OPENWEIGHT_ON(),'mode_openweight');
+ tryEarn(GAME_MODE==='mystery'&&w>=20,'mode_mystery');
  tryEarn(GAME_MODE==='god','god_mode');
+ // Record completed modes for the Mode Master achievement
+ const modeSet=getModeSet();
+ const thisMode=(GAME_MODE==='salary'||GAME_MODE==='mystery'||GAME_MODE==='god')?GAME_MODE:(OPENWEIGHT_ON()?'openweight':'normal');
+ modeSet.add(thisMode); saveModeSet(modeSet);
+ tryEarn(['normal','salary','openweight','mystery'].every(m=>modeSet.has(m)),'mode_master');
+ // ── Challenges ──
+ if(ACTIVE_CHALLENGE && w>=ACTIVE_CHALLENGE.target){
+   tryEarn(true,'chal_first');
+   tryEarn(true,'chal_'+ACTIVE_CHALLENGE.id);
+   const chalSet=getChalSet(); chalSet.add(ACTIVE_CHALLENGE.id); saveChalSet(chalSet);
+   tryEarn(CHALLENGES.every(c=>chalSet.has(c.id)),'chal_master');
+ }
  // update best
  if(w>prevBest)localStorage.setItem('29_best',String(w));
  return newly;
@@ -2488,7 +2549,7 @@ function buildShareText(){
    const star=f.tier==='GOAT'?'🐐':f.tier==='CHAMPION'?'🏆':f.tier==='PRIME'?'⭐':'•';
    return `${star} ${wcLabel(f.wc)}: ${f.name}`;
  }).join('\n');
- const url='https://29and0mmadraft.com';
+ const url='https://29-0mmadraft.com';
  const tag=perfect?'Can you go undefeated too?':'Can you beat my record?';
  return `${header}\nMode: ${mode}\n\nMY SQUAD:\n${squad}\n\n${tag}\n🥊 ${url}\n#MMA #UFC #290Draft`;
 }
@@ -2501,7 +2562,7 @@ function buildFriendText(){
    ?`I just went a PERFECT 29-0 on 29-0 MMA Draft! 🏆`
    :`I just went ${w}-${l} on 29-0 MMA Draft.`;
  const squad=G.roster.map(f=>`${wcLabel(f.wc)}: ${f.name}`).join('\n');
- const url='https://29and0mmadraft.com';
+ const url='https://29-0mmadraft.com';
  return `${intro}\nMode: ${mode}\n\nMy 12-fighter squad:\n${squad}\n\nThink you can beat it? Build your roster here 👉 ${url}`;
 }
 function shareOnX(){
@@ -2541,7 +2602,7 @@ function shareRecord(){
  const w=G.wins, l=G.losses;
  const perfect=(w>=29&&l===0);
  const goats=G.roster.filter(f=>f.tier==='GOAT').map(f=>f.name.split(' ').slice(-1)[0]);
- const url='https://29and0mmadraft.com';
+ const url='https://29-0mmadraft.com';
  // Build a clean, shareable message
  let txt;
  if(perfect){
@@ -2708,15 +2769,15 @@ function simFantasyRound(){
 // ════ FIGHTER MODAL ════
 function openFighterModal(idx){
  const f=FIGHTERS[idx];if(!f)return;
- const unlocked=unlockedFighters.has(f.name)||passwordUnlocked;const isSec=!unlocked;
+ const unlocked=true;const isSec=false; // all fighters are always viewable in the database
  const ig=f.tier==='GOAT'||f.tier==='SECRET',ip=f.tier==='PRIME';const leg=calcLegacy(f,3);
  const stats=[['Striking',f.striking],['Wrestling',f.wrestling],['Power',f.power],['Submission',f.submission||65],['Chin',f.chin],['Stamina',f.stamina],['Defense',f.defense||75],['Durability',f.durability||f.chin]];
  const accolades=(f.accolades||[]).map(a=>`<div class="accolade-item"><span class="accolade-icon">${a.icon}</span><span class="accolade-text">${a.text}</span></div>`).join('');
- document.getElementById('modal-content').innerHTML=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem"><div style="width:52px;height:52px;border-radius:50%;${avStyle(f)||'background:var(--bg3);color:var(--text2)'};font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${fIcon(f)}</div><div><div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px">${f.name}</div>${!isSec?`<div style="font-size:11px;color:var(--text3);margin-top:2px">${wcLabel(f.wc)} \u00b7 ${f.org} \u00b7 ${recOf(f)}</div>`:''}</div></div>
+ document.getElementById('modal-content').innerHTML=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem"><div style="width:52px;height:52px;border-radius:50%;overflow:hidden;${avStyle(f)||'background:var(--bg3);color:var(--text2)'};font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${fIcon(f)}</div><div><div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px">${f.name}</div>${!isSec?`<div style="font-size:11px;color:var(--text3);margin-top:2px">${wcLabel(f.wc)} \u00b7 ${f.org} \u00b7 ${recOf(f)}</div>`:''}</div></div>
  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem">${!isSec?`<span class="h2h-discipline">${f.discipline||'MMA'}</span><span class="h2h-discipline">${f.height||''}</span><span class="h2h-discipline">${f.weightLbs||''}lbs</span>`:''}</div>
  ${!isSec?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem">${f.country?`<span class="h2h-discipline">🌍 ${f.country}</span>`:''}${f.age?`<span class="h2h-discipline">🎂 ${f.age} yrs</span>`:''}${f.reach?`<span class="h2h-discipline">📏 ${f.reach} reach</span>`:''}${f.era?`<span class="h2h-discipline">📅 ${eraLabel(f.era)}</span>`:''}</div>
  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem">${f.finishes!==undefined?`<span class="score-pill"><b>${f.finishes}</b> finishes</span>`:''}${f.kos!==undefined?`<span class="score-pill" style="color:var(--gold-text)"><b>${f.kos}</b> KOs</span>`:''}${f.subs!==undefined?`<span class="score-pill" style="color:var(--purple-text)"><b>${f.subs}</b> subs</span>`:''}${f.titles?`<span class="score-pill" style="color:var(--mint-text)"><b>${f.titles}</b> titles</span>`:''}</div>`:''}
- ${isSec?`<p style="font-size:12px;color:var(--text3);font-style:italic;text-align:center;padding:1rem">Unlock this fighter in Trivia Mode by drafting them.</p>`:`<div style="text-align:center;margin:.5rem 0 .8rem;font-size:12px;color:var(--text2)">${(f.rec&&!f.hideRec)?`Record: <b style="color:var(--text)">${f.rec}</b>`:''}${f.height?` · ${f.height}`:''}${f.weightLbs?` · ${f.weightLbs} lbs`:''}</div>`}`;
+ ${`<div style="text-align:center;margin:.5rem 0 .8rem;font-size:12px;color:var(--text2)">${(f.rec&&!f.hideRec)?`Record: <b style="color:var(--text)">${f.rec}</b>`:''}${f.height?` · ${f.height}`:''}${f.weightLbs?` · ${f.weightLbs} lbs`:''}</div>`}`;
  document.getElementById('fighter-modal').style.display='flex';
 }
 function closeModal(e){if(!e||e.target===document.getElementById('fighter-modal'))document.getElementById('fighter-modal').style.display='none';}
@@ -2743,7 +2804,7 @@ function renderDB(){
  grid.innerHTML=visible.map(f=>{const gi=FIGHTERS.indexOf(f);const unlocked=true; // all fighters always available
  // GOAT fighters are always shown; PRIME, SECRET, and others hidden until unlocked via trivia/draft or password
  const isLocked=!unlocked;const isSec=isLocked;const ig=f.tier==='GOAT'||f.tier==='SECRET',ip=f.tier==='PRIME';const leg=calcLegacy(f,3);
- return `<div class="db-card${unlocked?'':' locked'}" onclick="openFighterModal(${gi})"><div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><div style="width:28px;height:28px;border-radius:50%;${avStyle(f)||'background:var(--bg3);color:var(--text2)'};font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${fIcon(f)}</div><div style="flex:1;min-width:0"><div class="db-card-name">${f.name}</div><div class="db-card-sub">${wcLabel(f.wc)+(f.height?' \u00b7 '+f.height:'')}</div><div style="margin-top:3px">${eraBadge(f)}</div></div>${isSec?'':``}</div>${`<div style="font-size:10px;color:var(--text2);margin-top:4px">Record: <b style="color:var(--text)">${f.rec||'—'}</b></div><div style="font-size:9px;color:var(--text3);margin-top:2px">${f.height||''}${f.weightLbs?' \u00b7 '+f.weightLbs+' lbs':''}</div>`}</div>`;
+ return `<div class="db-card${unlocked?'':' locked'}" onclick="openFighterModal(${gi})"><div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><div style="width:28px;height:28px;border-radius:50%;overflow:hidden;${avStyle(f)||'background:var(--bg3);color:var(--text2)'};font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${fIcon(f)}</div><div style="flex:1;min-width:0"><div class="db-card-name">${f.name}</div><div class="db-card-sub">${wcLabel(f.wc)+(f.height?' \u00b7 '+f.height:'')}</div><div style="margin-top:3px">${eraBadge(f)}</div></div>${isSec?'':``}</div>${`<div style="font-size:10px;color:var(--text2);margin-top:4px">Record: <b style="color:var(--text)">${f.rec||'—'}</b></div><div style="font-size:9px;color:var(--text3);margin-top:2px">${f.height||''}${f.weightLbs?' \u00b7 '+f.weightLbs+' lbs':''}</div>`}</div>`;
  }).join('');
 }
 
