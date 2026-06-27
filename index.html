@@ -901,7 +901,7 @@ const CHALLENGES=[
    filter:f=>f.tier!=='GOAT'},
  {id:'veterans',icon:'👴',name:'Old Guard',desc:'Draft only fighters aged 38+',target:18,
    filter:f=>(f.age||0)>=38},
- {id:'youngguns',icon:'⚡',name:'Young Guns',desc:'Draft only fighters aged 30 or under',target:20,
+ {id:'youngguns',icon:'⚡',name:'Young Guns',desc:'Openweight — draft 12 fighters aged 30 or under, any weight class',target:20,openweight:true,
    filter:f=>f.age&&f.age<=30},
  {id:'newblood',icon:'🌱',name:'New Blood',desc:'Draft only fighters with fewer than 20 pro fights',target:18,
    filter:f=>((f.w||0)+(f.l||0))<20},
@@ -1434,7 +1434,10 @@ const FIGHTERS=[
 {name:"Israel Adesanya",fullName:"Israel Mobolaji Adesanya",nick:"The Last Stylebender",wc:"LHW",gender:"M",height:'6\'4"',weightLbs:205,discipline:"Kickboxing",rec:"24-5",w:24,l:5,streak:0,ufc:true,titles:9,org:"MMA",init:"IA",age:36,country:"Nigeria",reach:'80"',finishes:15,kos:14,subs:1,era:"2020s",striking:92,wrestling:66,power:88,chin:80,stamina:78,defense:84,submission:64,durability:78,legacyOverride:150,tier:"PRIME"}
 ,
 {name:"Tatsuro Taira",fullName:"Tatsuro Taira",nick:"",wc:"FLW",gender:"M",height:'5\'7"',weightLbs:125,discipline:"BJJ / Striking",rec:"17-1",w:17,l:1,streak:0,ufc:true,titles:0,org:"MMA",init:"TT",age:25,country:"Japan",reach:'71"',finishes:11,kos:4,subs:7,era:"2020s",striking:84,wrestling:84,power:78,chin:80,stamina:84,defense:82,submission:86,durability:80,legacyOverride:118,tier:"B"},
-{name:"Asu Almabayev",fullName:"Asu Almabayev",nick:"",wc:"FLW",gender:"M",height:'5\'6"',weightLbs:125,discipline:"Wrestling / Grappling",rec:"22-3",w:22,l:3,streak:0,ufc:true,titles:0,org:"MMA",init:"AA",age:31,country:"Kazakhstan",reach:'67"',finishes:14,kos:5,subs:9,era:"2020s",striking:80,wrestling:86,power:76,chin:80,stamina:84,defense:80,submission:84,durability:80,legacyOverride:104,tier:"B"}
+{name:"Asu Almabayev",fullName:"Asu Almabayev",nick:"",wc:"FLW",gender:"M",height:'5\'6"',weightLbs:125,discipline:"Wrestling / Grappling",rec:"22-3",w:22,l:3,streak:0,ufc:true,titles:0,org:"MMA",init:"AA",age:31,country:"Kazakhstan",reach:'67"',finishes:14,kos:5,subs:9,era:"2020s",striking:80,wrestling:86,power:76,chin:80,stamina:84,defense:80,submission:84,durability:80,legacyOverride:104,tier:"B"},
+{name:"Zhang Mingyang",fullName:"Zhang Mingyang",nick:"Mountain Tiger",wc:"LHW",gender:"M",height:'6\'2"',weightLbs:205,discipline:"Sanda / Kickboxing",rec:"19-8",w:19,l:8,streak:0,ufc:true,titles:0,org:"MMA",init:"ZM",age:27,country:"China",reach:'77"',finishes:19,kos:13,subs:6,era:"2020s",striking:90,wrestling:70,power:92,chin:76,stamina:74,defense:72,submission:78,durability:76,legacyOverride:110,tier:"B"},
+{name:"Yaroslav Amosov",fullName:"Yaroslav Amosov",nick:"Dynamo",wc:"WW",gender:"M",height:'5\'11"',weightLbs:170,discipline:"Combat Sambo / Wrestling",rec:"30-1",w:30,l:1,streak:0,ufc:true,titles:4,org:"MMA",init:"YA",age:32,country:"Ukraine",reach:'75"',finishes:22,kos:9,subs:13,era:"2020s",striking:82,wrestling:92,power:80,chin:84,stamina:88,defense:86,submission:90,durability:84,legacyOverride:172,tier:"PRIME"},
+{name:"Charles Johnson",fullName:"Charles Anthony Johnson",nick:"InnerG",wc:"FLW",gender:"M",height:'5\'9"',weightLbs:125,discipline:"Striking / Muay Thai",rec:"19-8",w:19,l:8,streak:0,ufc:true,titles:0,org:"MMA",init:"CJ",age:35,country:"USA",reach:'70"',finishes:11,kos:8,subs:3,era:"2020s",striking:86,wrestling:72,power:78,chin:80,stamina:88,defense:78,submission:70,durability:80,legacyOverride:100,tier:"B"}
 ];
 const OPPS=[
 // ── LHW 205 ──
@@ -2303,13 +2306,34 @@ function divisionChoices(){
     if(!pool.length)pool=FIGHTERS.filter(f=>f.wc===wc&&!f.secret); // safety
     return shuf(pool).slice(0,4);
   }
-  // SALARY CAP: only offer fighters in this division you can still afford
+  // SALARY CAP: never let the player exceed the $100 budget or go negative.
+  // We reserve enough of the remaining budget to still afford the cheapest fighter for every
+  // future division slot, so a full 12-fighter roster is always completable. Only fighters that
+  // fit that ceiling are offered, sorted by VALUE (legacy per dollar) so the best deals surface first.
   if(GAME_MODE==='salary'){
     const rem=capRemaining();
-    let affordable=FIGHTERS.filter(f=>f.wc===wc&&!f.secret&&fighterCost(f)<=rem);
-    // guarantee at least the cheapest options remain pickable
-    if(affordable.length<2){affordable=FIGHTERS.filter(f=>f.wc===wc&&!f.secret).sort((a,b)=>fighterCost(a)-fighterCost(b)).slice(0,4);}
-    return shuf(affordable).slice(0,4);
+    const slotsLeft=requiredDivisions().length-G.roster.length; // includes this slot
+    const futureSlots=Math.max(0,slotsLeft-1);
+    // cheapest fighter available for each of the remaining FUTURE divisions (to reserve for)
+    const missing=missingWc().filter(w=>w!==wc);
+    let reserve=0;
+    missing.forEach(w=>{
+      const pool=FIGHTERS.filter(f=>f.wc===w&&!f.secret);
+      if(pool.length){reserve+=Math.min(...pool.map(fighterCost));}
+    });
+    // The most we can spend on THIS pick = remaining budget minus what we must keep for later picks
+    const maxThisPick=Math.max(0,rem-reserve);
+    let affordable=FIGHTERS.filter(f=>f.wc===wc&&!f.secret&&fighterCost(f)<=maxThisPick);
+    // Safety net: if nothing fits (shouldn't happen with reservation), offer the cheapest options
+    if(!affordable.length){
+      affordable=FIGHTERS.filter(f=>f.wc===wc&&!f.secret).sort((a,b)=>fighterCost(a)-fighterCost(b)).slice(0,4);
+    }
+    // Sort by VALUE: legacy per dollar (best deals first), then take a varied top set
+    affordable.sort((a,b)=>(calcLegacy(b,3)/fighterCost(b))-(calcLegacy(a,3)/fighterCost(a)));
+    // Offer a mix: the best-value options plus some variety from the rest
+    const topValue=affordable.slice(0,3);
+    const rest=shuf(affordable.slice(3));
+    return topValue.concat(rest).slice(0,4);
   }
   // GOD MODE: only PRIME, S, and GOAT fighters are offered.
   if(GAME_MODE==='god'){
@@ -2468,7 +2492,7 @@ function buildCard(f,i){
  const lockNote=!eligible?`<div style="font-size:8px;color:var(--red-text);background:var(--red-bg);border-radius:4px;padding:1px 4px;margin-top:3px;text-align:center">${OPENWEIGHT_ON()?'already on your team':wcLabel(f.wc)+' already drafted'}</div>`:'';
  return `<div class="pick-card${ig?' goat-card':ip?' prime-card':ic?' champion-card':''}${eligible?'':' pick-greyed'}" ${eligible?`onclick="selectPick('${key}')" data-pickkey="${key}"`:'style="opacity:.35;cursor:not-allowed;pointer-events:none"'}>
  <div class="pc-av" style="${av}">${MYSTERY_ON()?'?':fIcon(f)}</div>
- <div class="pc-name">${MYSTERY_ON()?'??? Mystery Fighter':f.name}${GAME_MODE==='salary'?` <span style="color:var(--green-text);font-weight:800">· $${fighterCost(f)}</span>`:''}</div>
+ <div class="pc-name">${MYSTERY_ON()?'??? Mystery Fighter':f.name}${GAME_MODE==='salary'?(()=>{const cost=fighterCost(f);const leg=calcLegacy(f,3);const deal=(cost<=6&&leg>=125);return ` <span style="color:var(--green-text);font-weight:800">· $${cost}</span>${deal?` <span style="color:var(--gold-text);font-weight:800" title="Great value">💎</span>`:''}`;})():''}</div>
  <div class="pc-rec">${pcRecLine(f)}</div>${lockNote}
  <div style="text-align:center;margin-top:2px"></div>
  
