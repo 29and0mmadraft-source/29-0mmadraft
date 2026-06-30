@@ -329,8 +329,12 @@ body {
 .fp-sub{font-size:9px;color:var(--text3)}
 .vs-divider{text-align:center;font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--red);margin:8px 0}
 .fantasy-result{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;margin-top:.9rem}
-.nav-tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:.9rem}
-.nav-tab{padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--text3);border-bottom:2px solid transparent;margin-bottom:-1px}
+.nav-tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:.9rem;overflow-x:scroll;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--text3) var(--bg2);padding-bottom:6px;flex-wrap:nowrap}
+.nav-tabs::-webkit-scrollbar{height:8px;-webkit-appearance:none}
+.nav-tabs::-webkit-scrollbar-track{background:var(--bg2);border-radius:4px}
+.nav-tabs::-webkit-scrollbar-thumb{background:var(--text3);border-radius:4px;border:1px solid var(--bg2)}
+.nav-tabs::-webkit-scrollbar-thumb:hover{background:var(--text2)}
+.nav-tab{padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--text3);border-bottom:2px solid transparent;margin-bottom:-1px;flex-shrink:0;white-space:nowrap}
 .nav-tab.active{color:var(--red);border-bottom-color:var(--red)}
 .main-content{display:none}.main-content.active{display:block}
 .fight-mode-badge{display:inline-block;font-family:'Bebas Neue',sans-serif;font-size:11px;padding:2px 8px;border-radius:4px;letter-spacing:1px;margin-left:6px}
@@ -486,7 +490,7 @@ body {
 </div>
 <div class="nav-tabs">
  <button class="nav-tab active" onclick="switchMain('game')">🥊 Draft</button>
- 
+ <button class="nav-tab" onclick="openPromoterTab()">🎪 Promoter</button>
  <button class="nav-tab" onclick="switchMain('db')">📋 Fighters</button>
  <button class="nav-tab" onclick="switchMain('lb')">🏆 Records</button>
  <button class="nav-tab" onclick="showInfoPage('achievements')">🏅 Achievements</button>
@@ -500,7 +504,7 @@ body {
  <div class="logo-num">29<span class="logo-dash">-</span>0</div>
  <div class="logo-sub">MMA Fighter Draft</div>
  </div>
- <p class="tagline">Draft 29 fighters and go for a perfect 29-0. Casual by default — flip on Trivia Mode (hard) — answer questions as you draft.</p>
+ <p class="tagline">Draft your squad of fighters — one from every weight class — and chase a perfect 29-0 record. Casual by default; flip on Trivia Mode (hard) to answer questions as you draft.</p>
  <div class="how-card">
  <b>Draft rule:</b> Your roster must include one fighter from every weight class.<br>
  <b>Each fight has a division:</b> you field your fighter from that weight class to compete.<br>
@@ -515,7 +519,7 @@ body {
  <option value="roulette">🎰 Roulette — random country &amp; decade each round (re-rolls allowed)</option>
  <option value="gauntlet">🛡️ Survival Gauntlet — fight round by round, one loss ends the run</option>
  <option value="showdown">🏆 Showdown — draft, win trivia to recruit elites, then beat the Final Boss</option>
- <option value="mystery">🎭 Mystery Draft — pick blind by record &amp; finishes, names revealed at the end</option>
+   <option value="mystery">🎭 Mystery Draft — pick blind by record &amp; finishes, names revealed at the end</option>
  </select>
  <div id="mode-desc" style="font-size:11px;color:var(--text3);margin-top:6px"></div>
  </div>
@@ -573,7 +577,14 @@ body {
  </div>
  <div id="fight-zone"></div>
  </div>
- <div id="s-showdown" class="screen">
+ <div id="s-promoter" class="screen">
+ <div style="text-align:center;margin-bottom:.8rem;padding-top:.3rem">
+   <div style="font-size:22px;font-weight:900;letter-spacing:-.02em">🎪 PROMOTER</div>
+   <div style="font-size:12px;color:var(--text3);margin-top:2px">Book a 5-fight card on a $60 budget. Pick 2 fighters per bout.</div>
+ </div>
+ <div id="promoter-body"></div>
+</div>
+<div id="s-showdown" class="screen">
  <div style="text-align:center;margin-bottom:.8rem;padding-top:.3rem">
    <div style="font-size:22px;font-weight:900;letter-spacing:-.02em">🏆 SHOWDOWN</div>
    <div style="font-size:12px;color:var(--text3);margin-top:2px">Answer trivia to recruit elite fighters, then beat the Final Boss.</div>
@@ -684,6 +695,118 @@ const MYSTERY_ON=()=>GAME_MODE==='mystery';
 const ROULETTE_ON=()=>GAME_MODE==='roulette';
 const GAUNTLET_ON=()=>GAME_MODE==='gauntlet';
 const SHOWDOWN_ON=()=>GAME_MODE==='showdown';
+const PROMOTER_ON=()=>GAME_MODE==='promoter';
+
+// ════ PROMOTER MODE (book a 5-fight fight card) ════
+// You're a UFC promoter booking a 5-bout card. Each of the 5 rounds is themed to a (re-rollable)
+// weight class; you're shown 8 fighters and pick 2 (the two fighters in that bout). 10 fighters total.
+// A $40 booking budget (salary prices) keeps you from stacking all elites. After booking, you order
+// the card (pick your main event) and the card's "draw" is graded S-A-B-C-D-F on total legacy,
+// with a +20 bonus for a marquee PRIME/GOAT-vs-PRIME/GOAT main event.
+const PROMOTER={
+  budget:150,         // booking budget (used only when budgetOn)
+  budgetOn:false,     // Budget variant turns this on
+  freeMode:false,     // FREE mode: full roster shown per division (not just 8 random), no budget
+  rounds:5,
+  round:0,            // current round 0..4
+  wc:null,            // current round's weight class
+  pool:[],            // 8 fighters shown this round
+  selected:[],        // the 2 picked this round
+  bouts:[],           // array of {wc, a, b}
+  spent:0,
+  rerolls:3,          // weight-class re-rolls available
+  titleFights:[],     // indices of bouts marked as title fights (+25 rating, $20 each)
+};
+function promoterReset(budgetOn,freeMode){
+  PROMOTER.budgetOn=!!budgetOn;
+  PROMOTER.freeMode=!!freeMode;
+  PROMOTER.round=0;PROMOTER.wc=null;PROMOTER.pool=[];PROMOTER.selected=[];
+  PROMOTER.bouts=[];PROMOTER.spent=0;PROMOTER.rerolls=3;PROMOTER.titleFights=[];
+}
+function promoterPickedNames(){
+  const s=new Set();
+  PROMOTER.bouts.forEach(b=>{s.add(b.a.name);s.add(b.b.name);});
+  PROMOTER.selected.forEach(f=>s.add(f.name));
+  return s;
+}
+function promoterRollWC(forceWc){
+  const taken=promoterPickedNames();
+  // pick a weight class that has at least 8 unused fighters
+  let wc=forceWc;
+  if(!wc){
+    const opts=REQUIRED_WC.filter(w=>FIGHTERS.filter(f=>f.wc===w&&!f.secret&&!taken.has(f.name)).length>=8);
+    wc=opts.length?shuf(opts)[0]:shuf(REQUIRED_WC)[0];
+  }
+  PROMOTER.wc=wc;
+  // Fighters from this WC (no repeat names already on the card). FREE mode shows the WHOLE
+  // division sorted by rating; otherwise 8 random for the draft-pool feel.
+  let pool=FIGHTERS.filter(f=>f.wc===wc&&!f.secret&&!taken.has(f.name));
+  if(PROMOTER.freeMode){ PROMOTER.pool=pool.slice().sort((a,b)=>calcLegacy(b,3)-calcLegacy(a,3)); }
+  else { PROMOTER.pool=shuf(pool).slice(0,8); }
+  PROMOTER.selected=[];
+}
+function promoterReroll(){
+  if(PROMOTER.rerolls<=0)return;
+  PROMOTER.rerolls--;
+  promoterRollWC();
+  renderPromoter();
+}
+function promoterReserve(){
+  // Fighters still needed AFTER buying the one we're about to click:
+  // remaining full bouts (rounds after this one) * 2, plus the other slot(s) left in THIS bout.
+  const slotsLeftThisBout=2-PROMOTER.selected.length-1; // -1 for the one we're buying now
+  const futureBoutSlots=(PROMOTER.rounds-PROMOTER.round-1)*2;
+  const stillNeeded=Math.max(0, slotsLeftThisBout)+futureBoutSlots;
+  return stillNeeded*6; // reserve $6/slot — safe even if a division's pool has no cheap fighters
+}
+function promoterCanAfford(f){
+  if(!PROMOTER.budgetOn)return true;                 // NORMAL mode: no budget, pick anyone
+  if(PROMOTER.selected.some(x=>x.name===f.name))return true; // already selected -> deselect always allowed
+  return (PROMOTER.spent+fighterCost(f))<=(PROMOTER.budget-promoterReserve());
+}
+function promoterToggle(idx){
+  const f=PROMOTER.pool[idx];
+  const i=PROMOTER.selected.findIndex(x=>x.name===f.name&&x.wc===f.wc);
+  if(i>=0){ PROMOTER.selected.splice(i,1); }
+  else{
+    if(PROMOTER.selected.length>=2)return;        // only 2 per bout
+    if(!promoterCanAfford(f))return;              // budget guard
+    PROMOTER.selected.push(f);
+  }
+  renderPromoter();
+}
+function promoterConfirmBout(){
+  if(PROMOTER.selected.length!==2)return;
+  PROMOTER.bouts.push({wc:PROMOTER.wc,a:PROMOTER.selected[0],b:PROMOTER.selected[1]});
+  PROMOTER.spent+=fighterCost(PROMOTER.selected[0])+fighterCost(PROMOTER.selected[1]);
+  PROMOTER.round++;
+  PROMOTER.selected=[];
+  if(PROMOTER.round>=PROMOTER.rounds){ promoterOrderPhase(); }
+  else{ promoterRollWC(); renderPromoter(); }
+}
+// Card scoring + grade
+function promoterScore(){
+  let total=0;
+  PROMOTER.bouts.forEach(b=>{ total+=calcLegacy(b.a,3)+calcLegacy(b.b,3); });
+  // Marquee main-event bonus: the FIRST bout (top of the card) is the main event
+  const main=PROMOTER.bouts[0];
+  let bonus=0;
+  if(main){
+    const elite=f=>f.tier==='GOAT'||f.tier==='PRIME';
+    if(elite(main.a)&&elite(main.b))bonus=20;
+  }
+  // Title fights: +25 rating each
+  const titleBonus=PROMOTER.titleFights.length*25;
+  return {total:total+bonus+titleBonus, base:total, bonus, titleBonus, titles:PROMOTER.titleFights.length};
+}
+function promoterGrade(score){
+  if(score>=1800)return {g:'S',label:'GOAT',c:'var(--gold-text)',msg:'Card of the year! A legendary, GOAT-tier lineup.'};
+  if(score>=1550)return {g:'A',c:'var(--purple-text)',msg:'Stacked card — fans got their money\'s worth.'};
+  if(score>=1250)return {g:'B',c:'var(--mint-text)',msg:'Solid card with a few real draws.'};
+  if(score>=1000)return {g:'C',c:'var(--text2)',msg:'A watchable card, nothing special.'};
+  if(score>=750) return {g:'D',c:'var(--text2)',msg:'Thin card — the crowd wanted more.'};
+  return {g:'F',c:'var(--red-text)',msg:'Flop. Empty seats and angry fans.'};
+}
 
 // ════ SHOWDOWN MODE (roguelike progression) ════
 // 1) Openweight initial draft of 12 fighters.
@@ -751,6 +874,199 @@ function showdownSquadBar(){
     return `<span style="display:inline-block;font-size:9px;font-weight:800;color:${c};margin:1px 3px">${f.tier==='GOAT'?'🐐':f.tier==='PRIME'?'⭐':'•'}${f.name.split(' ').slice(-1)[0]}</span>`;
   };
   return `<div style="background:var(--bg2);border-radius:var(--radius);padding:.6rem;margin-bottom:.8rem;text-align:center;line-height:1.7">${sorted.map(chip).join('')}</div>`;
+}
+let PROMOTER_BUDGET_PENDING=false; // budget toggle state on the start screen
+function openPromoterTab(){
+  GAME_MODE='promoter';
+  switchMain('game');           // promoter screen lives in the game container
+  show('s-promoter');
+  renderPromoterStart();
+  // highlight the Promoter nav tab
+  const tabs=document.querySelectorAll('.nav-tab');
+  tabs.forEach(t=>t.classList.remove('active'));
+  if(tabs[1])tabs[1].classList.add('active');
+}
+function promoterToggleBudgetPending(){
+  PROMOTER_BUDGET_PENDING=!PROMOTER_BUDGET_PENDING;
+  renderPromoterStart();
+}
+function renderPromoterStart(){
+  const on=PROMOTER_BUDGET_PENDING;
+  document.getElementById('promoter-body').innerHTML=`
+    <div style="text-align:center;margin-bottom:1rem">
+      <div style="font-size:46px">🎪</div>
+      <div style="font-size:22px;font-weight:900;letter-spacing:-.02em">PROMOTER MODE</div>
+      <div style="font-size:13px;color:var(--text2);margin-top:4px;line-height:1.5">You're the matchmaker. Book a 5-fight card and put on the best show you can — then get graded on the star power.</div>
+    </div>
+    <div style="background:var(--bg2);border-radius:var(--radius);padding:.9rem;margin-bottom:.9rem;color:var(--text)">
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:.5rem">How it works</div>
+      <div style="font-size:12px;line-height:1.7">
+        <div style="margin-bottom:6px">🥊 <b>5 bouts</b> — each round you're shown <b>8 fighters</b> from a weight class and pick <b>2</b> for the fight (10 fighters total, no repeats).</div>
+        <div style="margin-bottom:6px">🎲 <b>Reroll</b> the weight class up to 3 times if you don't like the matchups on offer.</div>
+        <div style="margin-bottom:6px">📋 <b>Order the card</b> afterward — drag bouts so your biggest fight is the <b>Main Event</b> up top.</div>
+        <div style="margin-bottom:6px">🌟 A <b>marquee main event</b> (PRIME/GOAT vs PRIME/GOAT) earns <b>+20</b>. Mark any bout a <b>🏆 Title Fight</b> for <b>+25</b>.</div>
+        <div>🏅 Your card is graded <b>S–A–B–C–D–F</b> on total star power. Aim for the legendary <b>S</b>!</div>
+      </div>
+    </div>
+    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:.5rem">Choose your mode</div>
+    <button onclick="promoterBegin(false,true)" style="display:block;width:100%;text-align:left;background:var(--bg2);border:2px solid var(--border);border-radius:var(--radius);padding:.8rem;margin-bottom:8px;cursor:pointer;color:var(--text)">
+      <div style="font-size:13px;font-weight:800">🆓 Free Mode</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:2px">The whole division on the table — pick any 2 fighters from the full roster, no budget. Build your dream card.</div>
+    </button>
+    <button onclick="promoterBegin(false,false)" style="display:block;width:100%;text-align:left;background:var(--bg2);border:2px solid var(--border);border-radius:var(--radius);padding:.8rem;margin-bottom:8px;cursor:pointer;color:var(--text)">
+      <div style="font-size:13px;font-weight:800">🎲 Casual Draft</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:2px">8 random fighters per division — pick the best 2 you're dealt, reroll if you don't like them. No budget.</div>
+    </button>
+    <button onclick="promoterBegin(true,false)" style="display:block;width:100%;text-align:left;background:var(--bg2);border:2px solid var(--border);border-radius:var(--radius);padding:.8rem;margin-bottom:8px;cursor:pointer;color:var(--text)">
+      <div style="font-size:13px;font-weight:800">💸 Budget Challenge</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:2px">8 random per division on a $150 salary cap. Title fights cost $20. The real promoter test.</div>
+    </button>`;
+}
+function promoterBegin(budgetOn,freeMode){
+  GAME_MODE='promoter';
+  enterPromoter(budgetOn,freeMode);
+}
+function enterPromoter(budgetOn,freeMode){
+  promoterReset(budgetOn,freeMode);
+  promoterRollWC();
+  show('s-promoter');
+  renderPromoter();
+}
+function promoterFighterCard(f,idx,picked){
+  const flag=(typeof COUNTRY_FLAGS!=='undefined'&&COUNTRY_FLAGS[f.country])?`<img src="https://flagcdn.com/w40/${COUNTRY_FLAGS[f.country]}.png" style="width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px">`:'';
+  const cost=fighterCost(f);
+  const afford=picked||promoterCanAfford(f);
+  const tierC=f.tier==='GOAT'?'var(--gold-text)':f.tier==='PRIME'?'var(--purple-text)':f.tier==='CHAMPION'?'var(--mint-text)':'var(--text3)';
+  return `<button onclick="promoterToggle(${idx})" ${afford?'':'disabled'} style="display:flex;align-items:center;width:100%;text-align:left;padding:8px 10px;margin-bottom:6px;border-radius:10px;border:2px solid ${picked?'var(--purple-text)':'var(--border)'};background:${picked?'var(--purple-bg)':afford?'var(--bg2)':'var(--bg3)'};opacity:${afford?1:.5};cursor:${afford?'pointer':'not-allowed'};color:var(--text)">
+    ${flag}
+    <span style="flex:1">
+      <span style="font-weight:700;font-size:13px">${f.name}</span>
+      <span style="display:block;font-size:10px;color:var(--text3)">${f.rec} · <span style="color:${tierC};font-weight:700">${f.tier}</span></span>
+    </span>
+    <span style="color:var(--green-text);font-weight:800;font-size:13px">$${cost}</span>
+  </button>`;
+}
+function renderPromoter(){
+  const remaining=PROMOTER.budget-PROMOTER.spent;
+  const header=`<div style="background:var(--bg2);border-radius:var(--radius);padding:.7rem;margin-bottom:.8rem;color:var(--text)">
+    <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700">
+      <span>Bout ${PROMOTER.round+1} of ${PROMOTER.rounds}</span>
+      ${PROMOTER.budgetOn?`<span style="color:var(--green-text)">💰 $${remaining} left</span>`:`<span style="color:var(--text3)">No budget — book freely</span>`}
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:3px">
+      <span>${wcLabel(PROMOTER.wc)} division</span>
+      <span>${PROMOTER.bouts.length} bouts booked</span>
+    </div>
+  </div>`;
+  const wcLine=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">
+    <div style="font-size:13px;font-weight:800">Pick 2 fighters for this bout (${PROMOTER.selected.length}/2)</div>
+    <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px" onclick="promoterReroll()" ${PROMOTER.rerolls>0?'':'disabled'}>🎲 Reroll WC (${PROMOTER.rerolls})</button>
+  </div>`;
+  const cardsInner=PROMOTER.pool.map((f,i)=>{
+    const picked=PROMOTER.selected.some(x=>x.name===f.name&&x.wc===f.wc);
+    return promoterFighterCard(f,i,picked);
+  }).join('');
+  // Free mode shows the whole division — make it scrollable so it doesn't overflow the screen.
+  const cards=PROMOTER.freeMode?`<div style="max-height:52vh;overflow-y:auto;padding-right:2px">${cardsInner}</div>`:cardsInner;
+  const confirm=`<button class="btn btn-primary" style="width:100%;margin-top:.6rem" onclick="promoterConfirmBout()" ${PROMOTER.selected.length===2?'':'disabled'}>${PROMOTER.round+1>=PROMOTER.rounds?'Lock final bout → order the card':'Confirm bout → next'}</button>`;
+  document.getElementById('promoter-body').innerHTML=header+wcLine+cards+confirm;
+}
+// ORDER PHASE: arrange the 5 bouts; last = main event
+function promoterOrderPhase(){
+  show('s-promoter');
+  renderPromoterOrder();
+}
+function promoterMoveBout(idx,dir){
+  const ni=idx+dir;
+  if(ni<0||ni>=PROMOTER.bouts.length)return;
+  const tmp=PROMOTER.bouts[idx];PROMOTER.bouts[idx]=PROMOTER.bouts[ni];PROMOTER.bouts[ni]=tmp;
+  renderPromoterOrder();
+}
+function promoterToggleTitle(idx){
+  const i=PROMOTER.titleFights.indexOf(idx);
+  if(i>=0){ PROMOTER.titleFights.splice(i,1); }
+  else{
+    // budget mode: title fight costs $20; block if it would bust the budget
+    if(PROMOTER.budgetOn && (PROMOTER.spent+20)>PROMOTER.budget) return;
+    PROMOTER.titleFights.push(idx);
+    if(PROMOTER.budgetOn) PROMOTER.spent+=20;
+  }
+  if(i>=0 && PROMOTER.budgetOn) PROMOTER.spent-=20; // refund on untoggle
+  renderPromoterOrder();
+}
+function renderPromoterOrder(){
+  const elite=f=>f.tier==='GOAT'||f.tier==='PRIME';
+  // index 0 = MAIN EVENT at the TOP. Lower bouts go DOWN the card.
+  const N=PROMOTER.bouts.length;
+  const rows=PROMOTER.bouts.map((b,i)=>{
+    const isMain=i===0;
+    const isCo=i===1;
+    const marquee=elite(b.a)&&elite(b.b);
+    const isTitle=PROMOTER.titleFights.includes(i);
+    const label=isMain?'🌟 MAIN EVENT':(isCo?'CO-MAIN':'Bout '+(N-i));
+    const titleAfford=isTitle||!PROMOTER.budgetOn||(PROMOTER.spent+20)<=PROMOTER.budget;
+    return `<div style="background:${isMain?'var(--purple-bg)':'var(--bg2)'};border-radius:10px;padding:8px 10px;margin-bottom:6px;color:var(--text)">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:9px;font-weight:800;color:${isMain?'var(--purple-text)':'var(--text3)'};width:74px">${label}</span>
+        <span style="flex:1;font-size:12px;font-weight:600">${b.a.name} <span style="color:var(--text3)">vs</span> ${b.b.name}${marquee?' <span title="Marquee" style="color:var(--gold-text)">★</span>':''}${isTitle?' <span title="Title fight" style="color:var(--gold-text)">🏆</span>':''}</span>
+        <span style="display:flex;flex-direction:column;gap:2px">
+          <button onclick="promoterMoveBout(${i},-1)" ${i===0?'disabled':''} style="font-size:9px;padding:1px 6px;border-radius:4px;border:1px solid var(--border);background:var(--bg3);color:var(--text);opacity:${i===0?.4:1}">▲</button>
+          <button onclick="promoterMoveBout(${i},1)" ${i===N-1?'disabled':''} style="font-size:9px;padding:1px 6px;border-radius:4px;border:1px solid var(--border);background:var(--bg3);color:var(--text);opacity:${i===N-1?.4:1}">▼</button>
+        </span>
+      </div>
+      <button onclick="promoterToggleTitle(${i})" ${titleAfford?'':'disabled'} style="margin-top:6px;width:100%;font-size:10px;font-weight:700;padding:4px;border-radius:6px;border:1px solid ${isTitle?'var(--gold-text)':'var(--border)'};background:${isTitle?'var(--gold-bg)':'var(--bg3)'};color:${isTitle?'var(--gold-text)':titleAfford?'var(--text2)':'var(--text3)'};cursor:${titleAfford?'pointer':'not-allowed'};opacity:${titleAfford?1:.5}">${isTitle?'🏆 Title Fight (+25 rating) — booked':PROMOTER.budgetOn?'🏆 Make Title Fight (+25 rating · $20)':'🏆 Make Title Fight (+25 rating)'}</button>
+    </div>`;
+  }).join('');
+  const remaining=PROMOTER.budget-PROMOTER.spent;
+  const budgetLine=PROMOTER.budgetOn?`<div style="font-size:11px;color:var(--green-text);font-weight:700;margin-top:4px">💰 $${remaining} left</div>`:'';
+  document.getElementById('promoter-body').innerHTML=`
+    <div style="background:var(--bg2);border-radius:var(--radius);padding:.7rem;margin-bottom:.8rem;text-align:center;color:var(--text)">
+      <div style="font-size:13px;font-weight:800">📋 Set your card order</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:3px">The TOP bout is your MAIN EVENT. A marquee (★) PRIME/GOAT main event earns +20. Mark any bout a 🏆 Title Fight for +25 rating${PROMOTER.budgetOn?' ($20 each)':''}.</div>
+      ${budgetLine}
+    </div>
+    ${rows}
+    <button class="btn btn-primary" style="width:100%;margin-top:.6rem" onclick="promoterFinish()">🎬 Run the card</button>`;
+}
+function promoterFinish(){
+  const sc=promoterScore();
+  const grade=promoterGrade(sc.total);
+  G._promoter={score:sc,grade};
+  // store best grade
+  const order=['F','D','C','B','A','S'];
+  const prev=localStorage.getItem('29_promoter_best')||'F';
+  if(order.indexOf(grade.g)>order.indexOf(prev))localStorage.setItem('29_promoter_best',grade.g);
+  // map onto wins for share/achievements (S/A=great)
+  G.wins=Math.min(29,Math.round(sc.total/40));G.losses=29-G.wins;
+  G.roster=[];PROMOTER.bouts.forEach(b=>{G.roster.push(b.a);G.roster.push(b.b);});
+  show('s-final');
+  // Hide the fight-record header — Promoter grades a CARD, not a 29-0 run.
+  const rec=document.getElementById('final-rec');if(rec)rec.style.display='none';
+  const sub=document.getElementById('final-sub');if(sub)sub.style.display='none';
+  document.getElementById('final-body').innerHTML=promoterHTML();
+  if(typeof checkAchievements==='function')checkAchievements();
+}
+function promoterHTML(){
+  const {score,grade}=G._promoter;
+  const N=PROMOTER.bouts.length;
+  const bouts=PROMOTER.bouts.map((b,i)=>{
+    const isMain=i===0;
+    const isTitle=PROMOTER.titleFights.includes(i);
+    return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 8px;background:${isMain?'var(--purple-bg)':'transparent'};border-radius:6px;margin-bottom:2px;color:var(--text)">
+      <span style="color:${isMain?'var(--purple-text)':'var(--text3)'};font-weight:${isMain?'800':'500'}">${isMain?'🌟 MAIN':'Bout '+(N-i)}${isTitle?' 🏆':''}</span>
+      <span style="font-weight:600">${b.a.name} vs ${b.b.name}</span>
+    </div>`;
+  }).join('');
+  return `<div style="text-align:center;margin-bottom:1rem">
+    <div style="font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--text3);font-weight:700">🎪 Promoter — Card Grade</div>
+    <div style="font-size:${grade.label?'40px':'64px'};font-weight:900;line-height:1.1;color:${grade.c}">${grade.label||grade.g}</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:.3rem">${grade.msg}</div>
+    <div style="font-size:12px;color:var(--text3)">Card score: <b style="color:var(--text)">${score.total}</b>${score.bonus?` <span style="color:var(--gold-text)">+${score.bonus} marquee</span>`:''}${score.titleBonus?` <span style="color:var(--gold-text)">+${score.titleBonus} (${score.titles} title fight${score.titles>1?'s':''})</span>`:''}</div>
+  </div>
+  <div style="background:var(--bg2);border-radius:var(--radius);padding:.7rem;margin-bottom:1rem;color:var(--text)">
+    <div style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--text3);margin-bottom:.4rem">The Card</div>
+    ${bouts}
+  </div>`;
 }
 function renderShowdown(){
   const proj=showdownProjectedWins();
@@ -953,6 +1269,8 @@ function selectMode(m){
    normal:'Classic mode — draft the best fighter in each of the 12 weight classes.',
    salary:'Every fighter has a cost by tier (GOAT $18 ... C $2). Build all 12 divisions under a $100 cap — you can\'t afford a roster of all GOATs!',
    openweight:'No weight limits — fill all 12 slots from the ENTIRE roster. Draft Jon Jones AND Khabib AND Amanda Nunes on one team if you want.',
+   promoter_budget:'Book a 5-fight UFC card on a $150 booking budget (salary prices). Across 5 rounds pick 2 fighters per bout (8 shown) from a re-rollable weight class, without busting the cap. Then order the card — a marquee PRIME/GOAT vs PRIME/GOAT main event earns +20. Graded S-A-B-C-D-F on star power.',
+   promoter:'Book a 5-fight UFC card! Across 5 rounds you pick 2 fighters per bout (8 shown) from a re-rollable weight class — no budget, book the biggest stars you can. No repeat names. Then order the card; a marquee PRIME/GOAT vs PRIME/GOAT main event earns +20. Graded S-A-B-C-D-F on total star power. Aim for the legendary S!',
    showdown:'Openweight roguelike: draft a 12-fighter squad, then face trivia mini-bosses. Each correct answer recruits a PRIME or GOAT fighter to replace your weakest pick, building toward beating the Final Boss (a 27-2 bar). Skip to the Final Boss anytime, or stack recruits first. Beat it for the Signature Reward!',
    gauntlet:'Your roster fights a 12-round gauntlet, weakest fighter first, with each opponent tougher than the last. Win a round to advance — but a single loss ends the run. How far can you survive?',
    roulette:'Each round rolls a random country AND decade — you can only draft fighters matching both. Stuck with a bad combo? You get 2 re-rolls per round to change the country or decade.',
@@ -987,9 +1305,19 @@ function switchMain(tab){
  document.querySelectorAll('.main-content').forEach(el=>el.classList.remove('active'));
  document.querySelectorAll('.nav-tab').forEach(el=>el.classList.remove('active'));
  const mc=document.getElementById('main-'+tab);if(mc)mc.classList.add('active');
- const idx=['game','db','lb'].indexOf(tab);
+ const idx=['game','promoter','db','lb'].indexOf(tab);
  const tabs=document.querySelectorAll('.nav-tab');
  if(idx>=0&&tabs[idx])tabs[idx].classList.add('active');
+ // Leaving the Promoter screen: if we're switching to a tab via the nav (not into promoter
+ // itself) and the promoter screen is showing, reset back to the normal home screen so the
+ // player isn't stuck inside Promoter mode.
+ if(tab!=='promoter'){
+   const prom=document.getElementById('s-promoter');
+   if(prom&&prom.classList.contains('active')){
+     if(GAME_MODE==='promoter')GAME_MODE='normal';
+     show('s-home');
+   }
+ }
  if(tab==='db')renderDB();if(tab==='lb')renderLeaderboard();
 }
 
@@ -1105,7 +1433,7 @@ const FIGHTERS=[
 {name:"Curtis Blaydes",fullName:"Curtis Blaydes",nick:"Razor",wc:"HW",gender:"M",height:'6\'4"',weightLbs:265,discipline:"Wrestling",rec:"18-4-1",w:18,l:4,streak:3,ufc:true,titles:0,org:"MMA",init:"CB",striking:78,wrestling:90,power:84,chin:78,stamina:84,defense:82,submission:86,durability:80,age:35,country:"USA",reach:'80\"',finishes:13,kos:12,subs:1,era:"2020s",legacyOverride:132,tier:"A"},
 {name:"Sergei Pavlovich",fullName:"Sergei Pavlovich",nick:"",wc:"HW",gender:"M",height:'6\'3"',weightLbs:240,discipline:"Sambo / Kickboxing",rec:"20-2",w:20,l:2,streak:5,ufc:true,titles:0,org:"MMA",init:"SP",striking:88,wrestling:72,power:96,chin:78,stamina:78,defense:74,submission:76,durability:76,age:34,country:"Russia",reach:'84\"',finishes:18,kos:15,subs:3,era:"2020s",legacyOverride:133,tier:"A"},
 {name:"Magomed Ankalaev",fullName:"Magomed Ankalaev",nick:"",wc:"LHW",gender:"M",height:'6\'3"',weightLbs:205,discipline:"Sambo",rec:"21-2-1",w:21,l:2,streak:9,ufc:true,titles:1,org:"MMA",init:"MA",striking:86,wrestling:88,power:88,chin:86,stamina:88,defense:86,submission:92,durability:86,age:34,country:"Russia",reach:'75\"',finishes:11,kos:10,subs:1,era:"2020s",legacyOverride:137,tier:"A"},
-{name:"Jamahal Hill",fullName:"Jamahal Hill",nick:"Sweet Dreams",wc:"LHW",gender:"M",height:'6\'4"',weightLbs:205,discipline:"Boxing",rec:"13-3",w:13,l:3,streak:4,ufc:true,titles:1,org:"MMA",init:"JHi",striking:90,wrestling:66,power:92,chin:80,stamina:80,defense:72,submission:48,durability:77,age:35,country:"USA",reach:'79\"',finishes:8,kos:7,subs:1,era:"2020s",legacyOverride:140,tier:"A"},
+{name:"Jamahal Hill",fullName:"Jamahal Hill",nick:"Sweet Dreams",wc:"LHW",gender:"M",height:'6\'4"',weightLbs:205,discipline:"Boxing",rec:"13-3",w:13,l:3,streak:4,ufc:true,titles:1,org:"MMA",init:"JHi",striking:90,wrestling:66,power:92,chin:80,stamina:80,defense:72,submission:48,durability:77,age:35,country:"USA",reach:'79\"',finishes:8,kos:7,subs:1,era:"2020s",legacyOverride:150,tier:"PRIME"},
 {name:"Dricus du Plessis",fullName:"Dricus du Plessis",nick:"Stillknocks",wc:"MW",gender:"M",height:'6\'0"',weightLbs:185,discipline:"MMA",rec:"23-3",w:23,l:3,streak:5,ufc:true,titles:3,org:"MMA",init:"DdP",striking:88,wrestling:78,power:90,chin:88,stamina:86,defense:84,submission:68,durability:86,age:32,country:"South Africa",reach:'76"',finishes:21,kos:9,subs:12,era:"2020s",legacyOverride:142,tier:"A",accolades:[{icon:"🏆",text:"Middleweight Champion"},{icon:"🇿🇦",text:"First South African champion"},{icon:"💥",text:"KO'd Adesanya and Strickland for title"}]},
 {name:"Sean Strickland",fullName:"Sean Strickland",nick:"Tarzan",wc:"MW",gender:"M",height:'6\'1"',weightLbs:185,discipline:"Boxing / Wrestling",rec:"30-7",w:30,l:7,streak:4,ufc:true,titles:2,org:"MMA",init:"SS",striking:92,wrestling:78,power:80,chin:94,stamina:95,defense:92,submission:70,durability:90,legacyOverride:196,age:35,country:"USA",reach:'76"',finishes:15,kos:11,subs:4,era:"2020s",tier:"CHAMPION",rare:true},
 {name:"Belal Muhammad",fullName:"Belal Muhammad",nick:"Remember the Name",wc:"WW",gender:"M",height:'5\'11"',weightLbs:170,discipline:"Wrestling",rec:"24-6",w:24,l:6,streak:9,ufc:true,titles:2,org:"MMA",init:"BeM",striking:80,wrestling:88,power:74,chin:88,stamina:92,defense:86,submission:84,durability:87,age:38,country:"USA",reach:'72"',finishes:6,kos:1,subs:5,era:"2020s",legacyOverride:144,tier:"A"},
@@ -1113,8 +1441,8 @@ const FIGHTERS=[
 {name:"Shavkat Rakhmonov",fullName:"Shavkat Rakhmonov",nick:"Nomad",wc:"WW",gender:"M",height:'6\'1"',weightLbs:170,discipline:"Sambo / Pankration",rec:"19-0",w:19,l:0,streak:19,ufc:true,titles:0,org:"MMA",init:"ShR",striking:88,wrestling:88,power:84,chin:90,stamina:90,defense:86,submission:92,durability:88,age:32,country:"Kazakhstan",reach:'77"',finishes:19,kos:8,subs:11,era:"2020s",legacyOverride:176,tier:"PRIME"},
 {name:"Arman Tsarukyan",fullName:"Arman Tsarukyan",nick:"",wc:"LW",gender:"M",height:'5\'9"',weightLbs:155,discipline:"Wrestling / Sambo",rec:"23-3",w:23,l:3,streak:5,ufc:true,titles:0,org:"MMA",init:"AT",striking:86,wrestling:88,power:80,chin:86,stamina:90,defense:84,submission:92,durability:85,age:30,country:"Armenia",reach:'72"',finishes:15,kos:9,subs:6,era:"2020s",legacyOverride:135,tier:"A"},
 {name:"Rafael Fiziev",fullName:"Rafael Fiziev",nick:"Ataman",wc:"LW",gender:"M",height:'5\'10"',weightLbs:155,discipline:"Kickboxing",rec:"14-3",w:14,l:3,streak:3,ufc:true,titles:0,org:"MMA",init:"RF",striking:90,wrestling:68,power:84,chin:80,stamina:82,defense:74,submission:50,durability:78,age:33,country:"Azerbaijan",reach:'71"',finishes:8,kos:8,subs:0,era:"2020s",legacyOverride:131,tier:"A"},
-{name:"Brian Ortega",fullName:"Brian Ortega",nick:"T-City",wc:"FW",gender:"M",height:'5\'8"',weightLbs:145,discipline:"BJJ",rec:"15-3",w:15,l:3,streak:7,ufc:true,titles:0,org:"MMA",init:"BO",striking:84,wrestling:83,power:79,chin:87,stamina:85,defense:80,submission:91,durability:84,age:35,country:"USA",reach:'69"',finishes:10,kos:3,subs:7,era:"2010s",legacyOverride:102,tier:"B"},
-{name:"Yair Rodriguez",fullName:"Yair Rodríguez",nick:"El Pantera",wc:"FW",gender:"M",height:'5\'11"',weightLbs:145,discipline:"Taekwondo / MMA",rec:"16-4",w:16,l:4,streak:4,ufc:true,titles:1,org:"MMA",init:"YR3",striking:90,wrestling:72,power:82,chin:82,stamina:82,defense:78,submission:54,durability:80,age:34,country:"Mexico",reach:'71"',finishes:13,kos:8,subs:5,era:"2020s",legacyOverride:99,tier:"B"},
+{name:"Brian Ortega",fullName:"Brian Ortega",nick:"T-City",wc:"FW",gender:"M",height:'5\'8"',weightLbs:145,discipline:"BJJ",rec:"15-3",w:15,l:3,streak:7,ufc:true,titles:0,org:"MMA",init:"BO",striking:84,wrestling:83,power:79,chin:87,stamina:85,defense:80,submission:91,durability:84,age:35,country:"USA",reach:'69"',finishes:10,kos:3,subs:7,era:"2010s",legacyOverride:102,tier:"B"}
+,
 {name:"Song Yadong",fullName:"Song Yadong",nick:"",wc:"BW",gender:"M",height:'5\'8"',weightLbs:135,discipline:"Sanda / MMA",rec:"23-9-1",w:23,l:9,streak:3,ufc:true,titles:0,org:"MMA",init:"SYd",striking:86,wrestling:74,power:80,chin:80,stamina:84,defense:76,submission:56,durability:78,age:29,country:"China",reach:'67"',finishes:10,kos:8,subs:2,era:"2020s",legacyOverride:98,tier:"B"},
 {name:"Umar Nurmagomedov",fullName:"Umar Nurmagomedov",nick:"",wc:"BW",gender:"M",height:'5\'10"',weightLbs:135,discipline:"Sambo / Judo",rec:"20-1",w:20,l:1,streak:18,ufc:true,titles:0,org:"MMA",init:"UNm",striking:82,wrestling:92,power:72,chin:86,stamina:90,defense:90,submission:96,durability:88,age:31,country:"Russia",reach:'69"',finishes:10,kos:4,subs:6,era:"2020s",legacyOverride:108,tier:"B",accolades:[{icon:"🔥",text:"18-0 undefeated — Khabib's cousin following the family tradition"},{icon:"🥋",text:"Sambo and Judo background like all Nurmagomedovs"}]},
 {name:"Marlon Vera",fullName:"Marlon Vera",nick:"Chito",wc:"BW",gender:"M",height:'5\'7"',weightLbs:135,discipline:"Boxing / MMA",rec:"23-11",w:23,l:11,streak:3,ufc:true,titles:0,org:"MMA",init:"MV",striking:82,wrestling:72,power:82,chin:84,stamina:84,defense:76,submission:54,durability:81,age:33,country:"Ecuador",reach:'70.5"',finishes:18,kos:8,subs:10,era:"2020s",legacyOverride:98,tier:"B"},
@@ -1126,19 +1454,19 @@ const FIGHTERS=[
 {name:"Alexa Grasso",fullName:"Alexa Grasso",nick:"",wc:"WFLW",gender:"F",height:'5\'5"',weightLbs:125,discipline:"Boxing / MMA",rec:"16-4",w:16,l:4,streak:3,ufc:true,titles:1,org:"MMA",init:"AGr",striking:84,wrestling:74,power:74,chin:80,stamina:84,defense:78,submission:56,durability:79,age:33,country:"Mexico",reach:'66"',finishes:8,kos:2,subs:6,era:"2020s",legacyOverride:162,tier:"PRIME"},
 {name:"Erin Blanchfield",fullName:"Erin Blanchfield",nick:"Cold Blooded",wc:"WFLW",gender:"F",height:'5\'5"',weightLbs:125,discipline:"Wrestling / BJJ",rec:"12-2",w:12,l:2,streak:5,ufc:true,titles:0,org:"MMA",init:"EBl",striking:76,wrestling:82,power:70,chin:78,stamina:86,defense:80,submission:90,durability:79,age:27,country:"USA",reach:'66"',finishes:7,kos:2,subs:5,era:"2020s",legacyOverride:100,tier:"B"},
 {name:"Raquel Pennington",fullName:"Raquel Pennington",nick:"Rocky",wc:"WBW",gender:"F",height:'5\'7"',weightLbs:135,discipline:"Wrestling / MMA",rec:"16-9",w:16,l:9,streak:3,ufc:true,titles:1,org:"MMA",init:"RPe",striking:78,wrestling:80,power:72,chin:84,stamina:84,defense:78,submission:76,durability:82,age:38,country:"USA",reach:'67"',finishes:5,kos:4,subs:1,era:"2010s",legacyOverride:139,tier:"A"},
-{name:"Julianna Pena",fullName:"Julianna Pena",nick:"The Venezuelan Vixen",wc:"WBW",gender:"F",height:'5\'7"',weightLbs:135,discipline:"Wrestling / BJJ",rec:"12-5",w:12,l:5,streak:4,ufc:true,titles:2,org:"MMA",init:"JPe",striking:78,wrestling:82,power:72,chin:82,stamina:86,defense:78,submission:90,durability:80,age:37,country:"USA",reach:'69"',finishes:6,kos:3,subs:3,era:"2020s",legacyOverride:106,tier:"B"},
-{name:"Dan Henderson",fullName:"Daniel Henderson",nick:"Hendo",wc:"MW",gender:"M",height:'5\'11"',weightLbs:185,discipline:"Freestyle Wrestling",rec:"32-15",w:32,l:15,streak:5,ufc:true,titles:3,org:"MMA",init:"DH",striking:86,wrestling:84,power:92,chin:82,stamina:79,defense:76,submission:80,durability:80,age:55,country:"USA",reach:'74"',finishes:24,kos:16,subs:8,era:"2000s",legacyOverride:100,tier:"B"},
+{name:"Julianna Pena",fullName:"Julianna Pena",nick:"The Venezuelan Vixen",wc:"WBW",gender:"F",height:'5\'7"',weightLbs:135,discipline:"Wrestling / BJJ",rec:"12-5",w:12,l:5,streak:4,ufc:true,titles:2,org:"MMA",init:"JPe",striking:78,wrestling:82,power:72,chin:82,stamina:86,defense:78,submission:90,durability:80,age:37,country:"USA",reach:'69"',finishes:6,kos:3,subs:3,era:"2020s",legacyOverride:106,tier:"B"}
+,
 {name:"Lyoto Machida",fullName:"Lyoto Carvalho Machida",nick:"The Dragon",wc:"LHW",gender:"M",height:'6\'2"',weightLbs:205,discipline:"Shotokan Karate / Sumo",rec:"26-12",w:26,l:12,streak:8,ufc:true,titles:3,org:"MMA",init:"LM",striking:88,wrestling:78,power:81,chin:85,stamina:84,defense:88,submission:60,durability:86,age:48,country:"Brazil",reach:'74\"',finishes:16,kos:8,subs:8,era:"2010s",legacyOverride:175,tier:"PRIME"},
 {name:"Shogun Rua",fullName:"Maurício Rua",nick:"",wc:"LHW",gender:"M",height:'6\'1"',weightLbs:205,discipline:"Brazilian Vale Tudo / Muay Thai",rec:"27-13",w:27,l:13,streak:3,ufc:true,titles:5,org:"MMA",init:"SR",striking:90,wrestling:74,power:89,chin:78,stamina:77,defense:74,submission:56,durability:76,age:44,country:"Brazil",reach:'76\"',finishes:21,kos:11,subs:10,era:"2000s",legacyOverride:174,tier:"PRIME"},
 {name:"Junior dos Santos",fullName:"Junior dos Santos",nick:"Cigano",wc:"HW",gender:"M",height:'6\'4"',weightLbs:240,discipline:"Boxing / BJJ",rec:"21-9",w:21,l:9,streak:3,ufc:true,titles:4,org:"MMA",init:"JD",striking:92,wrestling:70,power:92,chin:80,stamina:76,defense:76,submission:78,durability:78,age:42,country:"Brazil",reach:'77\"',finishes:15,kos:14,subs:1,legacyOverride:196,era:"2010s",tier:"PRIME",rare:true},
 {name:"Michael Bisping",fullName:"Michael Bisping",nick:"The Count",wc:"MW",gender:"M",height:'6\'2"',weightLbs:185,discipline:"Karate / Boxing",rec:"30-9",w:30,l:9,streak:5,ufc:true,titles:2,org:"MMA",init:"MB",striking:84,wrestling:79,power:76,chin:91,stamina:90,defense:82,submission:61,durability:87,age:47,country:"England",reach:'75"',finishes:18,kos:16,subs:2,era:"2010s",legacyOverride:107,tier:"B"},
 {name:"Tyron Woodley",fullName:"Tyron Woodley",nick:"The Chosen One",wc:"WW",gender:"M",height:'5\'9"',weightLbs:170,discipline:"Wrestling",rec:"20-7",w:20,l:7,streak:5,ufc:true,titles:5,org:"MMA",init:"TW",striking:85,wrestling:90,power:86,chin:84,stamina:82,defense:86,submission:86,durability:85,age:44,country:"USA",reach:'74"',finishes:11,kos:7,subs:4,era:"2010s",legacyOverride:176,tier:"PRIME"},
 {name:"Vitor Belfort",fullName:"Vitor Belfort",nick:"The Phenom",wc:"MW",gender:"M",height:'6\'1"',weightLbs:185,discipline:"BJJ / Boxing",rec:"26-14",w:26,l:14,streak:6,ufc:true,titles:2,org:"MMA",init:"VB",striking:89,wrestling:75,power:89,chin:71,stamina:74,defense:72,submission:83,durability:71,age:49,country:"Brazil",reach:'74"',finishes:21,kos:18,subs:3,era:"2000s",legacyOverride:107,tier:"B"},
-{name:"Chael Sonnen",fullName:"Chael Gregory Sonnen",nick:"The American Gangster",wc:"MW",gender:"M",height:'6\'0"',weightLbs:185,discipline:"Wrestling",rec:"30-17",w:30,l:17,streak:7,ufc:true,titles:0,org:"MMA",init:"CS",striking:74,wrestling:93,power:73,chin:86,stamina:96,defense:82,submission:89,durability:84,age:49,country:"USA",reach:'76"',finishes:18,kos:8,subs:10,era:"2010s",legacyOverride:101,tier:"B"},
+{name:"Chael Sonnen",fullName:"Chael Gregory Sonnen",nick:"The American Gangster",wc:"MW",gender:"M",height:'6\'0"',weightLbs:185,discipline:"Wrestling",rec:"30-17",w:30,l:17,streak:7,ufc:true,titles:0,org:"MMA",init:"CS",striking:74,wrestling:93,power:73,chin:86,stamina:96,defense:82,submission:89,durability:84,age:49,country:"USA",reach:'76"',finishes:18,kos:8,subs:10,era:"2010s",legacyOverride:174,tier:"PRIME"},
 {name:"Chan Sung Jung",fullName:"Chan Sung Jung",nick:"Korean Zombie",wc:"FW",gender:"M",height:'5\'9"',weightLbs:145,discipline:"Muay Thai / MMA",rec:"17-7",w:17,l:7,streak:3,ufc:true,titles:0,org:"MMA",init:"KZ",striking:86,wrestling:78,power:83,chin:81,stamina:82,defense:74,submission:60,durability:78,legacyOverride:196,age:39,country:"South Korea",reach:'72"',finishes:14,kos:6,subs:8,era:"2010s",tier:"PRIME",rare:true},
 {name:"Urijah Faber",fullName:"Urijah Christopher Faber",nick:"The California Kid",wc:"BW",gender:"M",height:'5\'6"',weightLbs:135,discipline:"Wrestling",rec:"35-11",w:35,l:11,streak:6,ufc:true,titles:5,org:"MMA",init:"UF",striking:82,wrestling:85,power:74,chin:87,stamina:92,defense:80,submission:81,durability:84,age:47,country:"USA",reach:'68"',finishes:26,kos:8,subs:18,era:"2000s",legacyOverride:101,tier:"B"},
 {name:"Mark Coleman",fullName:"Mark Coleman",nick:"The Hammer",wc:"HW",gender:"M",height:'6\'1"',weightLbs:230,discipline:"Freestyle Wrestling",rec:"16-10",w:16,l:10,streak:5,ufc:true,titles:3,org:"MMA",init:"MCo",striking:74,wrestling:99,power:86,chin:88,stamina:79,defense:82,submission:95,durability:86,age:61,country:"USA",reach:'74\"',finishes:14,kos:8,subs:6,legacyOverride:196,era:"PIONEER",tier:"PRIME",rare:true},
-{name:"Jan Blachowicz",fullName:"Jan Błachowicz",nick:"Prince of Cieszyn",wc:"LHW",gender:"M",height:'6\'2"',weightLbs:205,discipline:"Boxing / Wrestling",rec:"29-10-1",w:29,l:10,streak:3,ufc:true,titles:3,org:"MMA",init:"JBl",striking:85,wrestling:79,power:90,chin:84,stamina:80,defense:80,submission:75,durability:82,age:43,country:"Poland",reach:'78\"',finishes:18,kos:9,subs:9,era:"2020s",legacyOverride:106,tier:"B"},
+{name:"Jan Blachowicz",fullName:"Jan Błachowicz",nick:"Prince of Cieszyn",wc:"LHW",gender:"M",height:'6\'2"',weightLbs:205,discipline:"Boxing / Wrestling",rec:"29-10-1",w:29,l:10,streak:3,ufc:true,titles:3,org:"MMA",init:"JBl",striking:85,wrestling:79,power:90,chin:84,stamina:80,defense:80,submission:75,durability:82,age:43,country:"Poland",reach:'78\"',finishes:18,kos:9,subs:9,era:"2020s",legacyOverride:172,tier:"PRIME"},
 {name:"Antonio Rodrigo Nogueira",fullName:"Antônio Rodrigo Nogueira",nick:"Big Nog",wc:"HW",gender:"M",height:'6\'3"',weightLbs:235,discipline:"BJJ",rec:"35-9",w:35,l:9,streak:11,ufc:true,titles:5,org:"MMA",init:"BN",striking:82,wrestling:75,power:81,chin:90,stamina:79,defense:78,submission:83,durability:85,age:50,country:"Brazil",reach:'76\"',finishes:28,kos:11,subs:17,era:"2000s",legacyOverride:110,tier:"B"},
 {name:"Quinton Jackson",fullName:"Quinton Jackson",nick:"Rampage",wc:"LHW",gender:"M",height:'6\'1"',weightLbs:205,discipline:"Wrestling / Boxing",rec:"37-14",w:37,l:14,streak:5,ufc:true,titles:2,org:"MMA",init:"QJ",striking:88,wrestling:84,power:94,chin:90,stamina:84,defense:82,submission:70,durability:88,legacyOverride:196,age:48,country:"USA",reach:'73\"',finishes:24,kos:20,subs:4,era:"2000s",tier:"PRIME"},
 {name:"Takanori Gomi",fullName:"Takanori Gomi",nick:"The Fireball Kid",wc:"LW",gender:"M",height:'5\'8"',weightLbs:155,discipline:"Shooto / Boxing",rec:"37-14",w:37,l:14,streak:8,ufc:false,titles:1,org:"MMA",init:"TG",striking:90,wrestling:68,power:84,chin:78,stamina:84,defense:70,submission:50,durability:75,age:47,country:"Japan",reach:'70"',finishes:29,kos:23,subs:6,era:"2000s",legacyOverride:104,tier:"B"},
@@ -1165,7 +1493,7 @@ const FIGHTERS=[
 {name:"Eddie Hall",fullName:"Edward Stephen Hall",nick:"The Beast",wc:"HW",gender:"M",height:'6\'3"',weightLbs:340,discipline:"Strongman / Boxing",rec:"1-0",w:1,l:0,streak:0,ufc:false,titles:0,org:"Strongman / Boxing",init:"EH",striking:70,wrestling:82,power:100,chin:80,stamina:60,defense:64,submission:64,durability:74,noOutline:true,age:38,country:"England",reach:'78\"',finishes:1,kos:1,subs:0,era:"2020s",legacyOverride:118,tier:"B",rare:true,accolades:[{icon:"🏆",text:"2017 World's Strongest Man champion"},{icon:"💪",text:"First person to deadlift 500kg — power stat 100"},{icon:"🥊",text:"Celebrity boxing — transitioned to combat sports"},{icon:"🍺",text:"'I train like a machine' — legitimately most powerful puncher ever measured"}]},
 {name:"Alexander Volkov",fullName:"Alexander Volkov",nick:"Drago",wc:"HW",gender:"M",height:'6\'7"',weightLbs:240,discipline:"Kickboxing",rec:"39-10",w:39,l:10,streak:3,ufc:true,titles:0,org:"MMA",init:"AVk",striking:88,wrestling:72,power:86,chin:84,stamina:82,defense:82,submission:62,durability:82,age:37,country:"Russia",reach:'81\"',finishes:27,kos:24,subs:3,era:"2020s",legacyOverride:99,tier:"B",accolades:[{icon:"🥊",text:"Towering kickboxer — one of"},{icon:"📏",text:"Enormous reach advantage at 6 foot 7"}]},
 {name:"Aleksandar Rakic",fullName:"Aleksandar Rakić",nick:"",wc:"LHW",gender:"M",height:'6\'3\"',weightLbs:205,discipline:"Kickboxing",rec:"14-4",w:14,l:4,streak:2,ufc:true,titles:0,org:"MMA",init:"ARk",striking:86,wrestling:74,power:86,chin:82,stamina:80,defense:80,submission:64,durability:80,age:34,country:"Austria",reach:'78\"',finishes:9,kos:8,subs:1,era:"2020s",legacyOverride:98,tier:"B"},
-{name:"Paulo Costa",fullName:"Paulo Henrique Costa",nick:"The Eraser",wc:"MW",gender:"M",height:'6\'1\"',weightLbs:185,discipline:"Muay Thai / Boxing",rec:"14-4",w:14,l:4,streak:2,ufc:true,titles:0,org:"MMA",init:"PCo",striking:90,wrestling:72,power:90,chin:84,stamina:72,defense:74,submission:58,durability:80,age:35,country:"Brazil",reach:'72"',finishes:11,kos:11,subs:0,era:"2020s",legacyOverride:98,tier:"B",accolades:[{icon:"💪",text:"Bodybuilder physique with devastating power"},{icon:"🔥",text:"Known for high-volume, aggressive striking"}]},
+{name:"Paulo Costa",fullName:"Paulo Henrique Costa",nick:"The Eraser",wc:"MW",gender:"M",height:'6\'1\"',weightLbs:185,discipline:"Muay Thai / Boxing",rec:"14-4",w:14,l:4,streak:2,ufc:true,titles:0,org:"MMA",init:"PCo",striking:90,wrestling:72,power:90,chin:84,stamina:72,defense:74,submission:58,durability:80,age:35,country:"Brazil",reach:'72"',finishes:11,kos:11,subs:0,era:"2020s",legacyOverride:172,tier:"PRIME",accolades:[{icon:"💪",text:"Bodybuilder physique with devastating power"},{icon:"🔥",text:"Known for high-volume, aggressive striking"}]},
 {name:"Marvin Vettori",fullName:"Marvin Vettori",nick:"The Italian Dream",wc:"MW",gender:"M",height:'6\'0\"',weightLbs:185,discipline:"BJJ / Boxing",rec:"19-7",w:19,l:7,streak:2,ufc:true,titles:0,org:"MMA",init:"MVt",striking:84,wrestling:82,power:80,chin:86,stamina:90,defense:82,submission:72,durability:84,age:33,country:"Italy",reach:'74"',finishes:3,kos:2,subs:1,era:"2020s",legacyOverride:99,tier:"B"},
 {name:"Beneil Dariush",fullName:"Beneil Dariush",nick:"Benny",wc:"LW",gender:"M",height:'5\'10\"',weightLbs:155,discipline:"BJJ / Boxing",rec:"22-5",w:22,l:5,streak:3,ufc:true,titles:0,org:"MMA",init:"BDa",striking:84,wrestling:84,power:80,chin:84,stamina:86,defense:84,submission:86,durability:84,age:37,country:"USA",reach:'72"',finishes:13,kos:5,subs:8,era:"2020s",legacyOverride:100,tier:"B",accolades:[{icon:"🥋",text:"BJJ black belt with steadily improved striking"},{icon:"🔥",text:"One of the toughest outs at lightweight"}]},
 {name:"Diego Lopes",fullName:"Diego Lopes",nick:"",wc:"FW",gender:"M",height:'5\'9\"',weightLbs:145,discipline:"BJJ / Boxing",rec:"26-7",w:26,l:7,streak:4,ufc:true,titles:0,org:"MMA",init:"DLo",striking:90,wrestling:78,power:90,chin:82,stamina:84,defense:78,submission:82,durability:80,age:31,country:"Brazil",reach:'72"',finishes:23,kos:10,subs:13,era:"2020s",legacyOverride:148,tier:"A",accolades:[{icon:"💥",text:"Explosive finisher with knockout power and slick submissions"}]},
@@ -1255,7 +1583,7 @@ const FIGHTERS=[
 {name:"Casey O'Neill",fullName:"Casey O'Neill",nick:"",wc:"WFLW",gender:"F",height:'5\'7"',weightLbs:125,discipline:"MMA",rec:"10-2",w:10,l:2,streak:0,ufc:true,titles:0,org:"MMA",init:"CO",striking:78,wrestling:80,power:76,chin:78,stamina:80,defense:76,submission:78,durability:78,age:28,country:"Scotland",reach:'69"',finishes:5,kos:1,subs:4,era:"2020s",legacyOverride:77,tier:"C"},
 {name:"Max Holloway",fullName:"Max Holloway",nick:"",wc:"FW",gender:"M",height:'5\'11"',weightLbs:145,discipline:"Boxing / MMA",rec:"26-8",w:26,l:8,streak:0,ufc:true,titles:8,org:"MMA",init:"MHf",striking:98,wrestling:70,power:82,chin:92,stamina:98,defense:88,submission:74,durability:90,legacyOverride:196,age:35,country:"USA",reach:'69"',finishes:12,kos:11,subs:1,era:"2020s",tier:"PRIME",rare:true},
 {name:"Jeremy Stephens",fullName:"Jeremy Stephens",nick:"",wc:"FW",gender:"M",height:'5\'9"',weightLbs:145,discipline:"Boxing / Wrestling",rec:"28-20",w:28,l:20,streak:0,ufc:true,titles:0,org:"MMA",init:"JS3",striking:88,wrestling:74,power:92,chin:84,stamina:80,defense:74,submission:68,durability:84,age:39,country:"USA",reach:'71"',finishes:19,kos:18,subs:1,era:"2010s",legacyOverride:76,tier:"C"},
-{name:"Michael Page",fullName:"Michael Page",nick:"",wc:"WW",gender:"M",height:'6\'3"',weightLbs:170,discipline:"Kickboxing / Karate",rec:"23-3",w:23,l:3,streak:0,ufc:true,titles:0,org:"MMA",init:"MP",striking:92,wrestling:66,power:86,chin:76,stamina:80,defense:84,submission:62,durability:78,age:39,country:"England",reach:'79"',finishes:18,kos:13,subs:5,era:"2020s",legacyOverride:97,tier:"B"},
+{name:"Michael Page",fullName:"Michael Page",nick:"",wc:"WW",gender:"M",height:'6\'3"',weightLbs:170,discipline:"Kickboxing / Karate",rec:"23-3",w:23,l:3,streak:0,ufc:true,titles:0,org:"MMA",init:"MP",striking:92,wrestling:66,power:86,chin:76,stamina:80,defense:84,submission:62,durability:78,age:39,country:"England",reach:'79"',finishes:18,kos:13,subs:5,era:"2020s",legacyOverride:172,tier:"PRIME"},
 {name:"Sharaputdin Magomedov",fullName:"Sharaputdin Magomedov",nick:"",wc:"MW",gender:"M",height:'6\'3"',weightLbs:185,discipline:"Sanda / Wrestling",rec:"16-1",w:16,l:1,streak:16,ufc:true,titles:0,org:"MMA",init:"SM3",striking:82,wrestling:70,power:80,chin:80,stamina:80,defense:84,submission:55,durability:80,age:31,country:"Russia",reach:'73"',finishes:13,kos:10,subs:3,era:"2020s",legacyOverride:98,tier:"B"},
 {name:"Reinier de Ridder",fullName:"Reinier de Ridder",nick:"",wc:"MW",gender:"M",height:'6\'4"',weightLbs:185,discipline:"BJJ / Wrestling",rec:"22-2",w:22,l:2,streak:6,ufc:true,titles:0,org:"MMA",init:"RDR",striking:78,wrestling:86,power:78,chin:82,stamina:84,defense:82,submission:92,durability:84,age:35,country:"Netherlands",reach:'78"',finishes:18,kos:5,subs:13,era:"2020s",legacyOverride:101,tier:"B"},
 {name:"Islam Makhachev",fullName:"Islam Ramazanovich Makhachev",nick:"",wc:"WW",gender:"M",height:'5\'10"',weightLbs:170,discipline:"Sambo / Wrestling",rec:"28-1",w:28,l:1,streak:16,ufc:true,titles:5,org:"MMA",init:"IMw",striking:88,wrestling:96,power:84,chin:90,stamina:92,defense:92,submission:92,durability:90,legacyOverride:197,age:35,country:"Russia",reach:'70.5"',finishes:18,kos:5,subs:13,era:"2020s",tier:"CHAMPION",rare:true},
@@ -1275,7 +1603,7 @@ const FIGHTERS=[
 {name:"Nassourdine Imavov",fullName:"Nassourdine Imavov",nick:"",wc:"MW",gender:"M",height:'6\'3"',weightLbs:185,discipline:"Boxing / Wrestling",rec:"18-4",w:18,l:4,streak:5,ufc:true,titles:0,org:"MMA",init:"NI",striking:86,wrestling:80,power:82,chin:82,stamina:84,defense:82,submission:76,durability:82,age:31,country:"France",reach:'75"',finishes:11,kos:5,subs:6,era:"2020s",legacyOverride:100,tier:"B"},
 {name:"Brendan Allen",fullName:"Brendan Allen",nick:"",wc:"MW",gender:"M",height:'6\'2"',weightLbs:185,discipline:"BJJ / Boxing",rec:"24-7",w:24,l:7,streak:0,ufc:true,titles:0,org:"MMA",init:"BA",striking:82,wrestling:80,power:80,chin:80,stamina:82,defense:80,submission:86,durability:80,age:30,country:"USA",reach:'75"',finishes:20,kos:5,subs:15,era:"2020s",legacyOverride:78,tier:"C"},
 {name:"Robbie Lawler",fullName:"Robert Lawler",nick:"",wc:"WW",gender:"M",height:'5\'11"',weightLbs:170,discipline:"Boxing / Wrestling",rec:"30-16",w:30,l:16,streak:0,ufc:true,titles:3,org:"MMA",init:"RL",striking:92,wrestling:78,power:94,chin:90,stamina:84,defense:80,submission:70,durability:90,legacyOverride:196,age:44,country:"USA",reach:'74"',finishes:22,kos:21,subs:1,era:"2010s",tier:"PRIME",rare:true},
-{name:"John Dodson",fullName:"John Dodson",nick:"",wc:"FLW",gender:"M",height:'5\'3"',weightLbs:125,discipline:"Boxing / Wrestling",rec:"25-15",w:25,l:15,streak:0,ufc:true,titles:0,org:"MMA",init:"JD2",striking:86,wrestling:80,power:88,chin:82,stamina:82,defense:82,submission:72,durability:82,age:42,country:"USA",reach:'66"',finishes:13,kos:10,subs:3,era:"2010s",legacyOverride:77,tier:"C"},
+{name:"John Dodson",fullName:"John Dodson",nick:"",wc:"FLW",gender:"M",height:'5\'3"',weightLbs:125,discipline:"Boxing / Wrestling",rec:"25-15",w:25,l:15,streak:0,ufc:true,titles:0,org:"MMA",init:"JD2",striking:86,wrestling:80,power:88,chin:82,stamina:82,defense:82,submission:72,durability:82,age:42,country:"USA",reach:'66"',finishes:13,kos:10,subs:3,era:"2010s",legacyOverride:150,tier:"PRIME"},
 {name:"Deiveson Figueiredo",fullName:"Deiveson Figueiredo",nick:"",wc:"FLW",gender:"M",height:'5\'5"',weightLbs:125,discipline:"BJJ / Boxing",rec:"24-4-1",w:24,l:4,streak:0,ufc:true,titles:2,org:"MMA",init:"DF",striking:88,wrestling:82,power:92,chin:84,stamina:82,defense:84,submission:88,durability:84,legacyOverride:196,age:39,country:"Brazil",reach:'68"',finishes:18,kos:9,subs:9,era:"2020s",tier:"PRIME",rare:true},
 {name:"Anthony Smith",fullName:"Anthony Smith",nick:"",wc:"LHW",gender:"M",height:'6\'4"',weightLbs:205,discipline:"Boxing / BJJ",rec:"37-21",w:37,l:21,streak:0,ufc:true,titles:0,org:"MMA",init:"AS3",striking:84,wrestling:72,power:88,chin:78,stamina:80,defense:74,submission:84,durability:78,age:38,country:"USA",reach:'76\"',finishes:34,kos:20,subs:14,era:"2010s",legacyOverride:76,tier:"C"},
 {name:"Tecia Torres",fullName:"Tecia Torres",nick:"",wc:"WSTRAW",gender:"F",height:'5\'1"',weightLbs:115,discipline:"Karate / Wrestling",rec:"15-7",w:15,l:7,streak:0,ufc:true,titles:0,org:"MMA",init:"TT2",striking:80,wrestling:80,power:70,chin:80,stamina:84,defense:80,submission:74,durability:80,age:36,country:"USA",reach:'61"',finishes:1,kos:0,subs:1,era:"2010s",legacyOverride:76,tier:"C"},
@@ -1354,7 +1682,7 @@ const FIGHTERS=[
 {name:"Vitor Belfort",fullName:"Vitor Belfort",nick:"",wc:"LHW",gender:"M",height:'6\'0"',weightLbs:205,discipline:"MMA",rec:"26-14",w:26,l:14,streak:0,ufc:true,titles:2,org:"MMA",init:"VBl",age:49,country:"Brazil",reach:'74"',finishes:21,kos:18,subs:3,striking:90,wrestling:76,power:92,chin:76,stamina:76,defense:78,submission:80,durability:78,legacyOverride:196,era:"2000s",tier:"PRIME",rare:true},
 {name:"Ryan Bader",fullName:"Ryan Bader",nick:"Darth",wc:"LHW",gender:"M",height:'6\'2"',weightLbs:205,discipline:"MMA",rec:"31-8",w:31,l:8,streak:0,ufc:true,titles:5,org:"MMA",init:"RBl",age:43,country:"USA",reach:'74"',finishes:18,kos:12,subs:6,striking:82,wrestling:88,power:86,chin:82,stamina:80,defense:80,submission:72,durability:82,legacyOverride:196,era:"2010s",tier:"PRIME",rare:true},
 {name:"Phil Davis",fullName:"Phil Davis",nick:"",wc:"LHW",gender:"M",height:'6\'2"',weightLbs:205,discipline:"MMA",rec:"25-7",w:25,l:7,streak:0,ufc:true,titles:0,org:"MMA",init:"PDl",age:41,country:"USA",reach:'79"',finishes:8,kos:4,subs:4,striking:80,wrestling:90,power:78,chin:82,stamina:82,defense:82,submission:80,durability:82,legacyOverride:196,era:"2010s",tier:"PRIME",rare:true},
-{name:"Rich Franklin",fullName:"Rich Franklin",nick:"",wc:"MW",gender:"M",height:'6\'1"',weightLbs:185,discipline:"MMA",rec:"29-7",w:29,l:7,streak:0,ufc:true,titles:7,org:"MMA",init:"RFm",age:51,country:"USA",reach:'76"',finishes:18,kos:14,subs:4,striking:84,wrestling:80,power:84,chin:82,stamina:82,defense:80,submission:78,durability:82,legacyOverride:196,era:"2000s",tier:"PRIME",rare:true},
+{name:"Rich Franklin",fullName:"Rich Franklin",nick:"",wc:"MW",gender:"M",height:'6\'1"',weightLbs:185,discipline:"MMA",rec:"29-7",w:29,l:7,streak:0,ufc:true,titles:7,org:"MMA",init:"RFm",age:51,country:"USA",reach:'76"',finishes:18,kos:14,subs:4,striking:84,wrestling:80,power:84,chin:82,stamina:82,defense:80,submission:78,durability:82,legacyOverride:180,era:"2000s",tier:"PRIME",rare:true},
 {name:"Chris Weidman",fullName:"Chris Weidman",nick:"",wc:"MW",gender:"M",height:'6\'2"',weightLbs:185,discipline:"MMA",rec:"16-8",w:16,l:8,streak:0,ufc:true,titles:5,org:"MMA",init:"CWm",age:42,country:"USA",reach:'78"',finishes:10,kos:6,subs:4,striking:82,wrestling:88,power:84,chin:80,stamina:80,defense:80,submission:82,durability:80,legacyOverride:196,era:"2010s",tier:"PRIME",rare:true},
 {name:"Luke Rockhold",fullName:"Luke Rockhold",nick:"",wc:"MW",gender:"M",height:'6\'3"',weightLbs:185,discipline:"MMA",rec:"16-6",w:16,l:6,streak:0,ufc:true,titles:3,org:"MMA",init:"LRm",age:41,country:"USA",reach:'77"',finishes:12,kos:6,subs:6,striking:86,wrestling:82,power:86,chin:76,stamina:80,defense:80,submission:86,durability:78,legacyOverride:196,era:"2010s",tier:"PRIME",rare:true},
 {name:"Paulo Filho",fullName:"Paulo Filho",nick:"",wc:"MW",gender:"M",height:'5\'11"',weightLbs:185,discipline:"MMA",rec:"23-2",w:23,l:2,streak:0,ufc:true,titles:0,org:"MMA",init:"PFm",age:47,country:"Brazil",reach:'74"',finishes:14,kos:5,subs:9,striking:80,wrestling:84,power:80,chin:80,stamina:80,defense:80,submission:90,durability:80,legacyOverride:196,era:"2000s",tier:"PRIME",rare:true},
@@ -1374,7 +1702,7 @@ const FIGHTERS=[
 {name:"Paul Felder",fullName:"Paul Felder",nick:"The Irish Dragon",wc:"LW",gender:"M",height:'5\'11"',weightLbs:155,discipline:"MMA",rec:"17-6",w:17,l:6,streak:0,ufc:true,titles:0,org:"MMA",init:"PFl",age:41,country:"USA",reach:'70"',finishes:10,kos:10,subs:0,striking:88,wrestling:76,power:88,chin:80,stamina:80,defense:78,submission:76,durability:80,legacyOverride:196,era:"2010s",tier:"PRIME",rare:true},
 {name:"Frank Mir",fullName:"Frank Mir",nick:"",wc:"HW",gender:"M",height:'6\'3"',weightLbs:240,discipline:"Brazilian Jiu-Jitsu",rec:"19-13",w:19,l:13,streak:0,ufc:true,titles:3,org:"MMA",init:"FM",age:47,country:"USA",reach:'80"',finishes:16,kos:3,subs:13,striking:78,wrestling:78,power:82,chin:76,stamina:76,defense:78,submission:94,durability:78,legacyOverride:196,era:"2000s",tier:"PRIME",rare:true},
 {name:"Jared Cannonier",fullName:"Jared Cannonier",nick:"The Killa Gorilla",wc:"MW",gender:"M",height:'5\'11"',weightLbs:185,discipline:"Boxing / Wrestling",rec:"18-9",w:18,l:9,streak:0,ufc:true,titles:0,org:"MMA",init:"JCn",age:42,country:"USA",reach:'77.5"',finishes:13,kos:11,subs:2,striking:88,wrestling:78,power:92,chin:84,stamina:78,defense:78,submission:62,durability:82,era:"2020s",legacyOverride:97,tier:"B"},
-{name:"Darren Till",fullName:"Darren Till",nick:"The Gorilla",wc:"MW",gender:"M",height:'6\'0"',weightLbs:185,discipline:"Muay Thai / Boxing",rec:"19-5-1",w:19,l:5,streak:0,ufc:true,titles:0,org:"MMA",init:"DT",age:33,country:"England",reach:'74"',finishes:11,kos:7,subs:4,striking:90,wrestling:72,power:86,chin:80,stamina:80,defense:80,submission:68,durability:80,era:"2010s",legacyOverride:77,tier:"C"},
+{name:"Darren Till",fullName:"Darren Till",nick:"The Gorilla",wc:"MW",gender:"M",height:'6\'0"',weightLbs:185,discipline:"Muay Thai / Boxing",rec:"19-5-1",w:19,l:5,streak:0,ufc:true,titles:0,org:"MMA",init:"DT",age:33,country:"England",reach:'74"',finishes:11,kos:7,subs:4,striking:90,wrestling:72,power:86,chin:80,stamina:80,defense:80,submission:68,durability:80,era:"2010s",legacyOverride:172,tier:"PRIME"},
 {name:"Cung Le",fullName:"Cung Le",nick:"",wc:"MW",gender:"M",height:'5\'10"',weightLbs:185,discipline:"Sanshou / Kickboxing",rec:"9-3",w:9,l:3,streak:0,ufc:true,titles:3,org:"MMA",init:"CuL",age:53,country:"Vietnam/USA",reach:'72"',finishes:7,kos:6,subs:1,striking:92,wrestling:74,power:88,chin:78,stamina:76,defense:78,submission:60,durability:78,era:"2000s",legacyOverride:93,tier:"C"},
 {name:"Johnny Walker",fullName:"Walker Johnny Silva Barra de Souza",nick:"",wc:"LHW",gender:"M",height:'6\'5"',weightLbs:205,discipline:"Striking",rec:"21-9",w:21,l:9,streak:0,ufc:true,titles:0,org:"MMA",init:"JW",age:34,country:"Brazil",reach:'82"',finishes:17,kos:14,subs:3,era:"2020s",striking:88,wrestling:68,power:90,chin:72,stamina:74,defense:68,submission:70,durability:72,legacyOverride:105,tier:"C"},
 {name:"Valter Walker",fullName:"Valter Ignacio Silva Souza",nick:"The Monster",wc:"HW",gender:"M",height:'6\'5"',weightLbs:250,discipline:"Grappling",rec:"14-1",w:14,l:1,streak:4,ufc:true,titles:0,org:"MMA",init:"VW",age:28,country:"Brazil",reach:'80"',finishes:9,kos:6,subs:3,era:"2020s",striking:74,wrestling:82,power:80,chin:78,stamina:80,defense:74,submission:88,durability:78,legacyOverride:108,tier:"B"},
@@ -1437,7 +1765,39 @@ const FIGHTERS=[
 {name:"Asu Almabayev",fullName:"Asu Almabayev",nick:"",wc:"FLW",gender:"M",height:'5\'6"',weightLbs:125,discipline:"Wrestling / Grappling",rec:"22-3",w:22,l:3,streak:0,ufc:true,titles:0,org:"MMA",init:"AA",age:31,country:"Kazakhstan",reach:'67"',finishes:14,kos:5,subs:9,era:"2020s",striking:80,wrestling:86,power:76,chin:80,stamina:84,defense:80,submission:84,durability:80,legacyOverride:104,tier:"B"},
 {name:"Zhang Mingyang",fullName:"Zhang Mingyang",nick:"Mountain Tiger",wc:"LHW",gender:"M",height:'6\'2"',weightLbs:205,discipline:"Sanda / Kickboxing",rec:"19-8",w:19,l:8,streak:0,ufc:true,titles:0,org:"MMA",init:"ZM",age:27,country:"China",reach:'77"',finishes:19,kos:13,subs:6,era:"2020s",striking:90,wrestling:70,power:92,chin:76,stamina:74,defense:72,submission:78,durability:76,legacyOverride:110,tier:"B"},
 {name:"Yaroslav Amosov",fullName:"Yaroslav Amosov",nick:"Dynamo",wc:"WW",gender:"M",height:'5\'11"',weightLbs:170,discipline:"Combat Sambo / Wrestling",rec:"30-1",w:30,l:1,streak:0,ufc:true,titles:4,org:"MMA",init:"YA",age:32,country:"Ukraine",reach:'75"',finishes:22,kos:9,subs:13,era:"2020s",striking:82,wrestling:92,power:80,chin:84,stamina:88,defense:86,submission:90,durability:84,legacyOverride:172,tier:"PRIME"},
-{name:"Charles Johnson",fullName:"Charles Anthony Johnson",nick:"InnerG",wc:"FLW",gender:"M",height:'5\'9"',weightLbs:125,discipline:"Striking / Muay Thai",rec:"19-8",w:19,l:8,streak:0,ufc:true,titles:0,org:"MMA",init:"CJ",age:35,country:"USA",reach:'70"',finishes:11,kos:8,subs:3,era:"2020s",striking:86,wrestling:72,power:78,chin:80,stamina:88,defense:78,submission:70,durability:80,legacyOverride:100,tier:"B"}
+{name:"Charles Johnson",fullName:"Charles Anthony Johnson",nick:"InnerG",wc:"FLW",gender:"M",height:'5\'9"',weightLbs:125,discipline:"Striking / Muay Thai",rec:"19-8",w:19,l:8,streak:0,ufc:true,titles:0,org:"MMA",init:"CJ",age:35,country:"USA",reach:'70"',finishes:11,kos:8,subs:3,era:"2020s",striking:86,wrestling:72,power:78,chin:80,stamina:88,defense:78,submission:70,durability:80,legacyOverride:100,tier:"B"},
+{name:"Dan Henderson",fullName:"Dan Henderson",nick:"Hendo",wc:"HW",gender:"M",height:'6\'1"',weightLbs:205,discipline:"Wrestling / Boxing",rec:"32-15",w:32,l:15,streak:0,ufc:true,titles:3,org:"MMA",init:"DH",age:55,country:"USA",reach:'74"',finishes:20,kos:15,subs:2,era:"2000s",striking:86,wrestling:88,power:94,chin:86,stamina:80,defense:80,submission:70,durability:86,legacyOverride:174,tier:"PRIME"},
+{name:"Dan Henderson",fullName:"Dan Henderson",nick:"Hendo",wc:"MW",gender:"M",height:'6\'1"',weightLbs:185,discipline:"Wrestling / Boxing",rec:"32-15",w:32,l:15,streak:0,ufc:true,titles:3,org:"MMA",init:"DH",age:55,country:"USA",reach:'74"',finishes:20,kos:15,subs:2,era:"2000s",striking:86,wrestling:90,power:94,chin:86,stamina:82,defense:82,submission:72,durability:86,legacyOverride:180,tier:"PRIME"},
+{name:"Darren Till",fullName:"Darren Till",nick:"The Gorilla",wc:"WW",gender:"M",height:'6\'0"',weightLbs:170,discipline:"Muay Thai",rec:"19-5-1",w:19,l:5,streak:0,ufc:true,titles:0,org:"MMA",init:"DT",age:33,country:"England",reach:'74"',finishes:10,kos:7,subs:2,era:"2010s",striking:88,wrestling:72,power:86,chin:80,stamina:78,defense:82,submission:68,durability:78,legacyOverride:172,tier:"PRIME"},
+{name:"Nick Diaz",fullName:"Nick Diaz",nick:"",wc:"LW",gender:"M",height:'6\'0"',weightLbs:155,discipline:"Boxing / BJJ",rec:"26-11",w:26,l:11,streak:0,ufc:true,titles:4,org:"MMA",init:"ND",age:42,country:"USA",reach:'76"',finishes:16,kos:9,subs:7,era:"2000s",striking:90,wrestling:70,power:80,chin:86,stamina:92,defense:82,submission:84,durability:84,legacyOverride:176,tier:"PRIME"},
+{name:"Mark Coleman",fullName:"Mark Coleman",nick:"The Hammer",wc:"LHW",gender:"M",height:'6\'1"',weightLbs:205,discipline:"Wrestling",rec:"16-10",w:16,l:10,streak:0,ufc:true,titles:3,org:"MMA",init:"MC",age:60,country:"USA",reach:'74"',finishes:10,kos:5,subs:4,era:"PIONEER",striking:72,wrestling:92,power:88,chin:82,stamina:78,defense:74,submission:70,durability:84,legacyOverride:172,tier:"PRIME"},
+{name:"Yair Rodriguez",fullName:"Yair Rodriguez",nick:"El Pantera",wc:"FW",gender:"M",height:'5\'11"',weightLbs:145,discipline:"Taekwondo",rec:"16-4",w:16,l:4,streak:0,ufc:true,titles:1,org:"MMA",init:"YR",age:33,country:"Mexico",reach:'71"',finishes:10,kos:6,subs:4,era:"2020s",striking:90,wrestling:72,power:82,chin:80,stamina:84,defense:80,submission:78,durability:80,legacyOverride:150,tier:"PRIME"},
+{name:"Yair Rodriguez",fullName:"Yair Rodriguez",nick:"El Pantera",wc:"LW",gender:"M",height:'5\'11"',weightLbs:155,discipline:"Taekwondo",rec:"16-4",w:16,l:4,streak:0,ufc:true,titles:0,org:"MMA",init:"YR",age:33,country:"Mexico",reach:'71"',finishes:10,kos:6,subs:4,era:"2020s",striking:88,wrestling:70,power:82,chin:78,stamina:82,defense:78,submission:76,durability:78,legacyOverride:128,tier:"A"},
+{name:"Jamahal Hill",fullName:"Jamahal Hill",nick:"Sweet Dreams",wc:"HW",gender:"M",height:'6\'4"',weightLbs:235,discipline:"Boxing",rec:"13-3",w:13,l:3,streak:0,ufc:true,titles:0,org:"MMA",init:"JH",age:34,country:"USA",reach:'79"',finishes:9,kos:8,subs:1,era:"2020s",striking:86,wrestling:66,power:88,chin:76,stamina:74,defense:74,submission:60,durability:76,legacyOverride:125,tier:"A"},
+{name:"Alistair Overeem",fullName:"Alistair Overeem",nick:"The Reem",wc:"LHW",gender:"M",height:'6\'5"',weightLbs:205,discipline:"Kickboxing",rec:"47-19",w:47,l:19,streak:0,ufc:true,titles:1,org:"MMA",init:"AO",age:45,country:"Netherlands",reach:'80"',finishes:39,kos:24,subs:15,era:"2000s",striking:90,wrestling:78,power:92,chin:78,stamina:78,defense:78,submission:80,durability:80,legacyOverride:174,tier:"PRIME"},
+{name:"Paige VanZant",fullName:"Paige VanZant",nick:"12 Gauge",wc:"WSTRAW",gender:"F",height:'5\'4"',weightLbs:115,discipline:"Striking / Grappling",rec:"8-5",w:8,l:5,streak:0,ufc:true,titles:0,org:"MMA",init:"PV",age:31,country:"USA",reach:'62"',finishes:5,kos:1,subs:4,era:"2010s",striking:78,wrestling:76,power:72,chin:74,stamina:80,defense:74,submission:78,durability:74,legacyOverride:150,tier:"PRIME"},
+{name:"Bigfoot Silva",fullName:"Antonio Silva",nick:"Bigfoot",wc:"HW",gender:"M",height:'6\'4"',weightLbs:265,discipline:"BJJ / Striking",rec:"19-10",w:19,l:10,streak:0,ufc:true,titles:1,org:"MMA",init:"BS",age:46,country:"Brazil",reach:'80"',finishes:14,kos:9,subs:5,era:"2010s",striking:80,wrestling:78,power:90,chin:78,stamina:74,defense:76,submission:80,durability:82,legacyOverride:152,tier:"PRIME"},
+{name:"Lee Murray",fullName:"Lee Murray",nick:"Lightning",wc:"MW",gender:"M",height:'6\'2"',weightLbs:185,discipline:"BJJ / Boxing",rec:"8-2-1",w:8,l:2,streak:0,ufc:true,titles:0,org:"MMA",init:"LM",age:48,country:"England",reach:'76"',finishes:6,kos:3,subs:3,era:"2000s",striking:84,wrestling:76,power:86,chin:80,stamina:78,defense:78,submission:82,durability:80,legacyOverride:150,tier:"PRIME"},
+{name:"Ben Rothwell",fullName:"Ben Rothwell",nick:"Big Ben",wc:"HW",gender:"M",height:'6\'4"',weightLbs:265,discipline:"Striking / Grappling",rec:"40-16",w:40,l:16,streak:0,ufc:true,titles:0,org:"MMA",init:"BR",age:44,country:"USA",reach:'78"',finishes:30,kos:18,subs:12,era:"2010s",striking:80,wrestling:76,power:88,chin:80,stamina:72,defense:74,submission:78,durability:82,legacyOverride:150,tier:"PRIME"},
+{name:"Nate Landwehr",fullName:"Nate Landwehr",nick:"The Train",wc:"FW",gender:"M",height:'5\'9"',weightLbs:145,discipline:"Brawling / Grappling",rec:"18-6",w:18,l:6,streak:0,ufc:true,titles:0,org:"MMA",init:"NL",age:37,country:"USA",reach:'72"',finishes:13,kos:6,subs:7,era:"2020s",striking:82,wrestling:78,power:80,chin:82,stamina:90,defense:74,submission:80,durability:82,legacyOverride:104,tier:"B"},
+{name:"Doo Ho Choi",fullName:"Doo Ho Choi",nick:"The Korean Superboy",wc:"FW",gender:"M",height:'5\'9"',weightLbs:145,discipline:"Striking",rec:"14-4",w:14,l:4,streak:0,ufc:true,titles:0,org:"MMA",init:"DC",age:34,country:"South Korea",reach:'70"',finishes:12,kos:10,subs:2,era:"2010s",striking:88,wrestling:66,power:88,chin:78,stamina:74,defense:74,submission:64,durability:76,legacyOverride:100,tier:"B"},
+{name:"Waldo Cortes-Acosta",fullName:"Waldo Cortes-Acosta",nick:"Salsa Boy",wc:"HW",gender:"M",height:'6\'4"',weightLbs:240,discipline:"Boxing",rec:"14-1",w:14,l:1,streak:0,ufc:true,titles:0,org:"MMA",init:"WC",age:34,country:"Dominican Republic",reach:'78"',finishes:8,kos:7,subs:1,era:"2020s",striking:86,wrestling:68,power:88,chin:82,stamina:80,defense:78,submission:58,durability:82,legacyOverride:116,tier:"B"},
+{name:"King Mo",fullName:"Muhammed Lawal",nick:"King Mo",wc:"LHW",gender:"M",height:'5\'11"',weightLbs:205,discipline:"Wrestling",rec:"22-10",w:22,l:10,streak:0,ufc:true,titles:1,org:"MMA",init:"KM",age:44,country:"USA",reach:'74"',finishes:14,kos:11,subs:3,era:"2010s",striking:80,wrestling:92,power:88,chin:80,stamina:76,defense:78,submission:68,durability:80,legacyOverride:150,tier:"PRIME"},
+{name:"Molly McCann",fullName:"Molly McCann",nick:"Meatball",wc:"WFLW",gender:"F",height:'5\'2"',weightLbs:125,discipline:"Boxing / Striking",rec:"14-7",w:14,l:7,streak:0,ufc:true,titles:0,org:"MMA",init:"MM",age:35,country:"England",reach:'62"',finishes:7,kos:4,subs:3,era:"2020s",striking:80,wrestling:66,power:74,chin:74,stamina:80,defense:70,submission:66,durability:74,legacyOverride:96,tier:"C"},
+{name:"Vadim Nemkov",fullName:"Vadim Nemkov",nick:"",wc:"LHW",gender:"M",height:'6\'0"',weightLbs:205,discipline:"Sambo / Striking",rec:"20-2",w:20,l:2,streak:0,ufc:true,titles:6,org:"MMA",init:"VN",age:33,country:"Russia",reach:'76"',finishes:16,kos:10,subs:6,era:"2020s",striking:86,wrestling:84,power:86,chin:84,stamina:84,defense:84,submission:82,durability:84,legacyOverride:174,tier:"PRIME"},
+{name:"Vadim Nemkov",fullName:"Vadim Nemkov",nick:"",wc:"HW",gender:"M",height:'6\'0"',weightLbs:240,discipline:"Sambo / Striking",rec:"20-2",w:20,l:2,streak:0,ufc:true,titles:6,org:"MMA",init:"VN",age:33,country:"Russia",reach:'76"',finishes:16,kos:10,subs:6,era:"2020s",striking:84,wrestling:82,power:84,chin:82,stamina:82,defense:82,submission:82,durability:82,legacyOverride:150,tier:"PRIME"},
+{name:"Charles Bennett",fullName:"Charles Bennett",nick:"Krazy Horse",wc:"LW",gender:"M",height:'5\'9"',weightLbs:155,discipline:"Brawling",rec:"26-23-1",w:26,l:23,streak:0,ufc:true,titles:0,org:"MMA",init:"CB",age:46,country:"USA",reach:'71"',finishes:20,kos:13,subs:7,era:"2000s",striking:82,wrestling:64,power:86,chin:72,stamina:70,defense:62,submission:68,durability:72,legacyOverride:92,tier:"C"},
+{name:"Anshul Jubli",fullName:"Anshul Jubli",nick:"King",wc:"LW",gender:"M",height:'6\'0"',weightLbs:155,discipline:"Striking / Grappling",rec:"8-1",w:8,l:1,streak:0,ufc:true,titles:0,org:"MMA",init:"AJ",age:30,country:"India",reach:'73"',finishes:6,kos:4,subs:2,era:"2020s",striking:80,wrestling:72,power:78,chin:76,stamina:80,defense:74,submission:72,durability:76,legacyOverride:92,tier:"C"},
+{name:"Daniel Zellhuber",fullName:"Daniel Zellhuber",nick:"Golden Boy",wc:"LW",gender:"M",height:'6\'2"',weightLbs:155,discipline:"Striking / BJJ",rec:"16-2",w:16,l:2,streak:0,ufc:true,titles:0,org:"MMA",init:"DZ",age:26,country:"Mexico",reach:'75"',finishes:10,kos:5,subs:5,era:"2020s",striking:84,wrestling:72,power:78,chin:78,stamina:86,defense:78,submission:78,durability:78,legacyOverride:100,tier:"B"},
+{name:"Manuel Torres",fullName:"Manuel Torres",nick:"El Loco",wc:"LW",gender:"M",height:'5\'11"',weightLbs:155,discipline:"Striking",rec:"16-3",w:16,l:3,streak:0,ufc:true,titles:0,org:"MMA",init:"MT",age:30,country:"Mexico",reach:'73"',finishes:14,kos:11,subs:3,era:"2020s",striking:86,wrestling:70,power:86,chin:76,stamina:74,defense:72,submission:72,durability:76,legacyOverride:100,tier:"B"},
+{name:"Ignacio Bahamondes",fullName:"Ignacio Bahamondes",nick:"La Jaula",wc:"LW",gender:"M",height:'6\'2"',weightLbs:155,discipline:"Striking",rec:"17-5",w:17,l:5,streak:0,ufc:true,titles:0,org:"MMA",init:"IB",age:28,country:"Chile",reach:'76"',finishes:12,kos:8,subs:4,era:"2020s",striking:86,wrestling:70,power:82,chin:78,stamina:80,defense:76,submission:74,durability:78,legacyOverride:104,tier:"B"},
+{name:"Anthony Pettis",fullName:"Anthony Pettis",nick:"Showtime",wc:"WW",gender:"M",height:'5\'10"',weightLbs:170,discipline:"Taekwondo / BJJ",rec:"24-12",w:24,l:12,streak:0,ufc:true,titles:0,org:"MMA",init:"AP",age:39,country:"USA",reach:'72"',finishes:15,kos:7,subs:8,era:"2010s",striking:88,wrestling:70,power:82,chin:78,stamina:78,defense:76,submission:80,durability:76,legacyOverride:140,tier:"A"},
+{name:"Anthony Pettis",fullName:"Anthony Pettis",nick:"Showtime",wc:"FW",gender:"M",height:'5\'10"',weightLbs:145,discipline:"Taekwondo / BJJ",rec:"24-12",w:24,l:12,streak:0,ufc:true,titles:0,org:"MMA",init:"AP",age:39,country:"USA",reach:'72"',finishes:15,kos:7,subs:8,era:"2010s",striking:88,wrestling:70,power:82,chin:78,stamina:78,defense:76,submission:80,durability:76,legacyOverride:150,tier:"PRIME"},
+{name:"John Dodson",fullName:"John Dodson",nick:"The Magician",wc:"BW",gender:"M",height:'5\'3"',weightLbs:135,discipline:"Boxing / Wrestling",rec:"25-15",w:25,l:15,streak:0,ufc:true,titles:0,org:"MMA",init:"JD",age:41,country:"USA",reach:'66"',finishes:12,kos:9,subs:3,era:"2010s",striking:86,wrestling:80,power:86,chin:80,stamina:82,defense:80,submission:70,durability:80,legacyOverride:128,tier:"A"},
+{name:"Raymond Daniels",fullName:"Raymond Daniels",nick:"The Real Deal",wc:"WW",gender:"M",height:'6\'0"',weightLbs:170,discipline:"Karate / Kickboxing",rec:"3-1",w:3,l:1,streak:0,ufc:true,titles:0,org:"MMA",init:"RD",age:45,country:"USA",reach:'74"',finishes:3,kos:3,subs:0,era:"2020s",striking:92,wrestling:58,power:88,chin:74,stamina:72,defense:74,submission:50,durability:72,legacyOverride:150,tier:"PRIME"},
+{name:"Dada 5000",fullName:"Dhafir Harris",nick:"Dada 5000",wc:"HW",gender:"M",height:'6\'1"',weightLbs:265,discipline:"Brawling",rec:"2-1",w:2,l:1,streak:0,ufc:true,titles:0,org:"MMA",init:"DD",age:48,country:"USA",reach:'76"',finishes:2,kos:2,subs:0,era:"2010s",striking:66,wrestling:50,power:78,chin:64,stamina:42,defense:52,submission:44,durability:64,legacyOverride:50,tier:"C"},
+{name:"Joe Schilling",fullName:"Joe Schilling",nick:"Stitch 'Em Up",wc:"MW",gender:"M",height:'6\'1"',weightLbs:185,discipline:"Kickboxing",rec:"5-7",w:5,l:7,streak:0,ufc:true,titles:0,org:"MMA",init:"JS",age:41,country:"USA",reach:'75"',finishes:4,kos:4,subs:0,era:"2010s",striking:90,wrestling:56,power:88,chin:74,stamina:70,defense:68,submission:52,durability:72,legacyOverride:92,tier:"C"},
+{name:"Thiago Santos",fullName:"Thiago Santos",nick:"Marreta",wc:"LHW",gender:"M",height:'6\'2"',weightLbs:205,discipline:"Muay Thai / BJJ",rec:"22-12",w:22,l:12,streak:0,ufc:true,titles:0,org:"MMA",init:"TS",age:42,country:"Brazil",reach:'76"',finishes:17,kos:14,subs:3,era:"2010s",striking:90,wrestling:72,power:92,chin:78,stamina:76,defense:74,submission:72,durability:78,legacyOverride:150,tier:"PRIME"}
 ];
 const OPPS=[
 // ── LHW 205 ──
@@ -1683,7 +2043,7 @@ function eraBadge(f){
  const st=colors[f.era]||'background:var(--bg3);color:var(--text2)';
  return `<span style="${st};font-size:8px;font-weight:800;padding:1px 5px;border-radius:8px;letter-spacing:.03em">${lbl}</span>`;
 }
-const COUNTRY_FLAGS={"Angola":"ao","Argentina":"ar","Armenia":"am","Australia":"au","Austria":"at","Azerbaijan":"az","Bahamas/USA":"us","Belarus":"by","Brazil":"br","Cameroon":"cm","Canada":"ca","China":"cn","Croatia":"hr","Cuba":"cu","Czech Republic":"cz","Denmark":"dk","Ecuador":"ec","England":"gb-eng","France":"fr","Georgia":"ge","Georgia/Spain":"ge","Iraq":"iq","Ireland":"ie","Italy":"it","Japan":"jp","Kazakhstan":"kz","Kyrgyzstan":"kg","Mexico":"mx","Moldova":"md","Myanmar":"mm","Netherlands":"nl","New Zealand":"nz","Nigeria":"ng","Poland":"pl","Russia":"ru","Scotland":"gb-sct","South Africa":"za","South Korea":"kr","Spain/Georgia":"es","Sweden":"se","UAE":"ae","USA":"us","Vietnam/USA":"vn","Ukraine":"ua"};
+const COUNTRY_FLAGS={"India":"in","Chile":"cl","Angola":"ao","Argentina":"ar","Armenia":"am","Australia":"au","Austria":"at","Azerbaijan":"az","Bahamas/USA":"us","Belarus":"by","Brazil":"br","Cameroon":"cm","Canada":"ca","China":"cn","Croatia":"hr","Cuba":"cu","Czech Republic":"cz","Denmark":"dk","Ecuador":"ec","England":"gb-eng","France":"fr","Georgia":"ge","Georgia/Spain":"ge","Iraq":"iq","Ireland":"ie","Italy":"it","Japan":"jp","Kazakhstan":"kz","Kyrgyzstan":"kg","Mexico":"mx","Moldova":"md","Myanmar":"mm","Netherlands":"nl","New Zealand":"nz","Nigeria":"ng","Poland":"pl","Russia":"ru","Scotland":"gb-sct","South Africa":"za","South Korea":"kr","Spain/Georgia":"es","Sweden":"se","UAE":"ae","USA":"us","Dominican Republic":"do","Vietnam/USA":"vn","Ukraine":"ua"};
 function flagCode(f){
  // ISO code (flagcdn) of the fighter's home country; first country for dual-nationality.
  if(!f||!f.country)return '';
@@ -2135,6 +2495,8 @@ function startDraft(){
  G._wcOrder=null;
  RL_country=null;RL_decade=null;RL_rerolls=0;
  if(GAME_MODE==='endless'){startEndlessDraft();return;}
+ if(GAME_MODE==='promoter'){switchMain('game');enterPromoter(false);return;}
+ if(GAME_MODE==='promoter_budget'){GAME_MODE='promoter';switchMain('game');enterPromoter(true);return;}
  G={roster:[],wins:0,losses:0,fightsDone:0,triviaQ:shuf(TRIVIA),currentOpp:null,selectedFighter:null,jonesUsed:false,khabibUsed:false,nunesUsed:false,gspUsed:false,primeUsed:{},secretUsed:{},correctCount:0,rerolls:3,liveFight:null};
  PICK_MAP._m={};switchMain('game');show('s-draft');renderDraft();
 }
@@ -2653,6 +3015,8 @@ const ACHIEVEMENTS=[
  {id:'mode_gauntlet',icon:'🛡️',name:'Gauntlet Runner',desc:'Survive 8+ rounds in Survival Gauntlet mode'},
  {id:'gauntlet_clear',icon:'🏆',name:'Last One Standing',desc:'Clear the entire Survival Gauntlet (survive all rounds)'},
  {id:'showdown_win',icon:'🎖️',name:'Boss Slayer',desc:'Beat the Final Boss in Showdown mode'},
+ {id:'promoter_a',icon:'🎪',name:'Sold Out Arena',desc:'Book an A-grade card or better in Promoter mode'},
+ {id:'promoter_s',icon:'🏟️',name:'Card of the Year',desc:'Book a legendary S-grade card in Promoter mode'},
  {id:'god_mode',icon:'⚡',name:'Among Gods',desc:'Complete a run in God Mode'},
  {id:'mode_master',icon:'🎮',name:'Mode Master',desc:'Complete a run in every game mode (Normal, Salary, Openweight, Mystery)'},
  // ── Challenges ──
@@ -2718,6 +3082,7 @@ function checkAchievements(){
  tryEarn(OPENWEIGHT_ON(),'mode_openweight');
  tryEarn(GAME_MODE==='mystery'&&w>=20,'mode_mystery');
  tryEarn(SHOWDOWN_ON()&&w>=SHOWDOWN.bar,'showdown_win');
+ if(PROMOTER_ON()&&G._promoter){var pg=G._promoter.grade.g;tryEarn(pg==='A'||pg==='S','promoter_a');tryEarn(pg==='S','promoter_s');}
  if(GAUNTLET_ON()&&G._gauntlet){
    tryEarn(G._gauntlet.survived>=8,'mode_gauntlet');
    tryEarn(!G._gauntlet.eliminated,'gauntlet_clear');
@@ -3018,6 +3383,7 @@ function modeLabel(){
  if(GAME_MODE==='roulette')return '🎰 Roulette mode';
  if(GAME_MODE==='gauntlet')return '🛡️ Survival Gauntlet mode';
  if(GAME_MODE==='showdown')return '🏆 Showdown mode';
+ if(GAME_MODE==='promoter')return '🎪 Promoter mode';
  if(GAME_MODE==='god')return '⚡ God mode';
  return '🥊 Normal mode';
 }
@@ -3153,6 +3519,8 @@ function gauntletHTML(){
   </div>`;
 }
 function showFinal(perfect){
+ const _r=document.getElementById('final-rec');if(_r)_r.style.display='';
+ const _s=document.getElementById('final-sub');if(_s)_s.style.display='';
  const newAchievements=checkAchievements();
  unlockFighters(G.roster.map(f=>f.name));saveRun(G.wins,G.losses,G.roster);show('s-final');
  // Endless champion mode: unlock Tyson at 100+ wins even on the eventual loss
